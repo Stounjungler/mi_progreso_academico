@@ -292,6 +292,10 @@ function mostrarOverlayLogin(mostrar) {
             el.removeAttribute('inert');
         }
     });
+
+    if (!mostrar && typeof window.recargarCarreraDesdeStorage === 'function') {
+        window.recargarCarreraDesdeStorage();
+    }
 }
 
 // Exponer control desde UI (delegador) para abrir/cerrar overlay

@@ -170,9 +170,19 @@ selectCarrera.onchange = () => {
     if (window.notificarCambioParaNube) window.notificarCambioParaNube();
     modoPrereq = false;
     prereqEditandoId = null;
-    document.getElementById('prereqModal').style.display = 'none';
+    const modalPrereq = document.getElementById('prereqModal');
+    if (modalPrereq) modalPrereq.style.display = 'none';
     renderMalla();
 };
+
+window.recargarCarreraDesdeStorage = () => {
+    carreraActiva = localStorage.getItem(LS_CARRERA) || 'sin_asignar';
+    if (selectCarrera) selectCarrera.value = carreraActiva;
+    renderMalla();
+};
+
+// Renderizar la malla al inicializar la app
+renderMalla();
 
 /* ---- Prerrequisitos ---- */
 function ramosAnteriores(carreraId, semestreIdx) {
