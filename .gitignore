@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Environment & Configs
+.env
+.env.local
+.env.development.local
+.env.production.local
+js/__config__.js
+
+# Debug & Logs
+*.log
+firebase-debug.log
+firestore-debug.log
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build / Output
+dist/
+build/
+.vercel/

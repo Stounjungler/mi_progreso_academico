@@ -1,0 +1,39 @@
+Tareas pendientes en el proyecto "Mi-Progreso-Academico":
+
+1) Integrar y hardenizar Firebase Auth + Firestore (parcial)
+   - Finalizar pruebas de flujo popup/redirect en entornos (desktop/móvil).
+   - Evitar exponer secretos en el repo: usar variables de entorno en Netlify o mecanismo de reemplazo en build.
+   - Revisar reglas de Firestore para seguridad (solo owner puede leer/escribir su doc).
+   - Archivo(s): js/cloud.js (config hardcodeada ahora).
+
+2) Agregar CSP (Content Security Policy) y SRI (Subresource Integrity)
+   - Definir política CSP para evitar `unsafe-inline` y permitir solo fuentes/estilos/frames necesarios.
+   - Añadir SRI a `vendor/jspdf.umd.min.js` si se sirve desde CDN, y revisar recursos externos (Google Fonts, GIS client).
+   - Archivo(s): index.html, posibles headers en Netlify (_headers).
+
+3) Crear `README.md` con pasos de despliegue Netlify + Firebase
+   - Instrucciones para configurar variables de entorno (FIREBASE_CONFIG, GIS_CLIENT_ID).
+   - Build & deploy pasos, reglas de Firestore recomendadas.
+
+4) QA final y pruebas básicas
+   - Probar en Chrome/Firefox/Safari y móviles.
+   - Verificar comportamiento offline/localStorage y sincronización en varios dispositivos.
+   - Chequear accesibilidad (axe-core), contrastes y navegación teclado.
+
+5) Migrar el resto de `onclick`/eventos inline en `varias/versiones_index/` y otros HTML
+   - Reemplazar por `data-action` y asegurar delegación cubre todos los casos.
+   - Archivo(s): varias/versiones_index/*.html (≈30+ archivos detectados con `onclick`).
+
+6) Extraer y reemplazar imágenes Base64 restantes (~90 occurrences)
+   - Decodificar y guardar en `Mallas FINARQ/`, actualizar referencias (src / srcset).
+
+7) Mejoras de accesibilidad adicionales
+   - Mejorar focus trap avanzado en modales (inert polyfill para navegadores antiguos).
+   - Añadir `aria-live` para notificaciones de estado (syncEstado ya existe pero podría mejorar).
+
+8) Documentar y añadir tests automáticos (opcional)
+   - Pequeñas pruebas unitarias o E2E (Playwright) para flujos críticos: login, backup/restore, cambio de estado.
+
+---
+Estado actual: modales con focus-trap implementado (js/app.js), login integrado parcialmente (js/cloud.js). 
+Si quieres, puedo convertir este `PENDIENTES.txt` en `README.md` o crear issues/PRs con los items.

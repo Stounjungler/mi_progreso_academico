@@ -1,0 +1,27 @@
+SRI (Subresource Integrity) recommendations for this project:
+
+1) What SRI does:
+   - SRI adds an integrity attribute to `<script>` or `<link>` tags that load third-party resources, ensuring the fetched file matches the expected hash.
+
+2) Where to add SRI in this project (recommended):
+   - If you serve any vendor libraries from a CDN (e.g., jspdf from CDN, pdfobject, etc.), prefer adding `integrity` and `crossorigin="anonymous"` attributes on the tag.
+   - Example:
+     <script src="https://cdn.example.com/lib.min.js" integrity="sha384-..." crossorigin="anonymous"></script>
+
+3) Notes about current external resources:
+   - Google Identity (`https://accounts.google.com/gsi/client`) and Google Fonts (`https://fonts.googleapis.com`) often change and may not be suitable for SRI unless you pin an exact known version and are prepared to update the hash periodically.
+   - Firebase JS SDK imports in `js/cloud.js` use ES module imports from `https://www.gstatic.com/firebasejs/...` and cannot use SRI via `import` statements. If you want SRI protection, vendor-bundle the Firebase SDK during build (npm + bundler) and serve a local file with an `integrity` attribute, or host the build artifact on your own CDN with SRI.
+
+4) How to compute an SRI hash (if hosting a file yourself):
+   - Use OpenSSL or the `subresource-integrity` npm package. Example:
+     openssl dgst -sha384 -binary lib.min.js | openssl base64 -A
+   - Then prefix with `sha384-` and set `integrity="sha384-BASE64HASH"`.
+
+5) Recommended action list:
+   - Host critical vendor JS locally (or bundle with your build) so you can calculate SRI and serve predictable files.
+   - Avoid adding SRI to resources that change frequently (Google Fonts, GIS) unless you pin versions and accept maintenance.
+   - Consider using a build step to create a hashed vendor bundle and compute SRI automatically.
+
+If quieres, puedo:
+ - Generar un `vendor/` bundle con Firebase (usando esbuild/rollup) y añadir `integrity` para su tag de carga, o
+ - Calcular SRI para cualquier archivo estático que me indiques y añadir los atributos en `index.html`.

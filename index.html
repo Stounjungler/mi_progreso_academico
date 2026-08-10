@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <!-- App logic moved to external scripts: `js/app.js` and `js/cloud.js` -->
+
+    <!-- Content Security Policy: restricts sources for scripts, styles, fonts and connections. Adjust as needed for hosting. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://accounts.google.com https://apis.google.com; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://www.gstatic.com https://firestore.googleapis.com https://www.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; img-src 'self' data: blob: https:; frame-src https://accounts.google.com https://*.google.com; object-src 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com;">
+    <title>Mi Progreso Académico</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="icon" href="favicon.svg">
+    <script defer src="js/app.js"></script>
+    <script src="js/__config__.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script type="module" src="js/cloud.js"></script>
+</head>
+<body>
+
+    <noscript>
+        <div class="noscript-warning">Esta aplicación requiere JavaScript para funcionar. Por favor habilita JavaScript o usa un navegador compatible.</div>
+    </noscript>
+
+    <header class="site-header">
+        <div class="header-brand">🎓 Mi Progreso Académico</div>
+        <div class="header-actions">
+            <div id="usuarioInfo" class="usuario-info hidden" aria-hidden="true">
+                <img id="usuarioFoto" class="usuario-foto" src="" alt="Foto de usuario">
+                <div class="usuario-textos">
+                    <span id="usuarioNombre" class="usuario-nombre"></span>
+                    <span id="syncEstado" class="usuario-sync"></span>
+                </div>
+                <button class="btn btn-ghost" id="btnCerrarSesion" title="Cerrar sesión" data-action="uiRequestSignOut">Salir</button>
+            </div>
+
+            <button id="btnHeaderLogin" class="btn btn-primary" data-action="mostrarOverlayLogin:true" aria-hidden="false">Iniciar sesión</button>
+            <button id="temaToggleBtn" class="btn-tema" title="Cambiar tema">☀️</button>
+            <button id="btnTutorial" class="btn btn-ghost">📘 Tutorial</button>
+            <button id="btnAyuda" class="btn btn-ghost">❔ Ayuda</button>
+        </div>
+    </header>
+
+    <main class="container" id="appRoot">
+        <div class="tabs">
+            <button class="tab-btn activo" id="tabBtnMalla">🎓 Malla Curricular</button>
+            <button class="tab-btn" id="tabBtnRamos">📊 Mis Ramos <span class="tab-badge" id="badgeRamos">0</span></button>
+        </div>
+
+        <section id="panel-malla" class="panel activo">
+            <div class="selector-card">
+                <label for="selectCarrera">Selecciona tu carrera</label>
+                <select id="selectCarrera"></select>
+            </div>
+            <div id="contenidoMalla"></div>
+        </section>
+
+        <section id="panel-ramos" class="panel">
+            <div class="toolbar">
+                <div class="toolbar-actions">
+                    <button id="btnAgregarRamo" class="btn">➕ Agregar Ramo</button>
+                    <button id="btnExportarPDF" class="btn btn-ghost">Exportar PDF</button>
+                </div>
+            </div>
+            <div id="listaRamos"></div>
+        </section>
+    </main>
+
+    <!-- Modales (mantener ids usados por js/app.js) -->
+    <div id="tutorialModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="tutorialTitulo">
+            <h2 id="tutorialTitulo">Guía rápida</h2>
+            <div id="tutorialBody">Contenido del tutorial...</div>
+            <button class="btn btn-primary" id="tutorialCerrar">¡Entendido!</button>
+        </div>
+    </div>
+
+    <div id="mallaOficialModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-content modal-content-img" role="dialog" aria-modal="true" aria-labelledby="mallaOficialTitulo">
+            <h2 id="mallaOficialTitulo">Malla Oficial 2025 🎓</h2>
+            <p class="muted">Revisa aquí la malla curricular original desde donde se precargaron los prerrequisitos.</p>
+            <img src="Mallas%20FINARQ/malla-2025.svg" alt="Malla Oficial 2025" loading="lazy">
+            <button class="btn btn-primary" id="mallaOficialCerrar">Cerrar</button>
+        </div>
+    </div>
+
+    <div id="confirmarEliminarModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-content" role="dialog" aria-modal="true">
+            <h2>Eliminar Ramo 🗑️</h2>
+            <p>¿Estás seguro de eliminar <strong id="confirmarEliminarNombre"></strong>?</p>
+            <div class="dialog-actions">
+                <button class="btn btn-ghost" id="confirmarEliminarCancelar">Cancelar</button>
+                <button class="btn" id="confirmarEliminarAceptar">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login overlay -->
+    <div id="loginOverlay" class="login-overlay" aria-hidden="true">
+            <div class="login-card" id="loginCardNormal">
+            <div class="login-logo">🎓</div>
+            <h1>Mi Progreso Académico</h1>
+            <p>Inicia sesión con tu cuenta de Google para guardar tus notas en la nube y acceder desde cualquier dispositivo.</p>
+            <div id="googleButtonDiv" class="google-button-placeholder"></div>
+            <button id="btnLoginGoogle" class="btn btn-ghost hidden" data-action="uiRequestSignIn">Iniciar sesión</button>
+            <!-- Emulator fallback: login por email/password (solo si FIREBASE_USE_EMULATOR=true) -->
+            <div id="emulatorLogin" class="emulator-login">
+                <input id="emEmail" type="email" placeholder="test@local.test" class="full-input" />
+                <input id="emPass" type="password" placeholder="contraseña" class="full-input" />
+                <div class="dialog-actions"><button class="btn" id="btnEmSignUp">Crear cuenta (emu)</button><button class="btn btn-ghost" id="btnEmSignIn">Ingresar (emu)</button></div>
+                <p id="emMsg" class="login-estado-msg em-msg"></p>
+            </div>
+            <p id="loginEstadoMsg" class="login-estado-msg"></p>
+        </div>
+    </div>
+
+    <footer class="footer">© <span id="anioActual"></span> Mi Progreso Académico</footer>
+
+    <!-- Year is set from js/app.js to comply with CSP (no inline scripts) -->
+</body>
+</html>

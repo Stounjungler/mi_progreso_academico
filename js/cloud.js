@@ -1,0 +1,450 @@
+/* PARTE 4 — CUENTA Y SINCRONIZACIÓN EN LA NUBE (Firebase Auth + Firestore)
+   Extraído de index.html como módulo. */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+import {
+    getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithCredential, signOut, onAuthStateChanged, connectAuthEmulator
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
+import {
+    getFirestore, doc, getDoc, onSnapshot, runTransaction, connectFirestoreEmulator
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+
+// firebaseConfig is injected at build/runtime into `window.__FIREBASE_CONFIG` by `scripts/write-config.js`.
+const injected = window.__FIREBASE_CONFIG || {};
+const firebaseConfig = {
+    apiKey: injected.apiKey || '',
+    authDomain: injected.authDomain || '',
+    projectId: injected.projectId || '',
+    storageBucket: injected.storageBucket || '',
+    messagingSenderId: injected.messagingSenderId || '',
+    appId: injected.appId || ''
+};
+
+const GIS_CLIENT_ID = (window.__FIREBASE_CONFIG && window.__FIREBASE_CONFIG.gisClientId) || '';
+const USE_EMULATOR = (window.__FIREBASE_CONFIG && window.__FIREBASE_CONFIG.useEmulator) || false;
+
+// If running with the emulator and no apiKey was injected, provide a harmless fallback
+if (USE_EMULATOR && !firebaseConfig.apiKey) {
+    firebaseConfig.apiKey = 'fake-api-key-for-emulator';
+}
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// If using emulator, connect client SDK to local emulator endpoints
+if (USE_EMULATOR) {
+    try {
+        // Auth emulator expects full URL
+        connectAuthEmulator(auth, 'http://127.0.0.1:9099');
+    } catch (e) { console.warn('connectAuthEmulator failed', e); }
+    try {
+        connectFirestoreEmulator(db, '127.0.0.1', 8081);
+    } catch (e) { console.warn('connectFirestoreEmulator failed', e); }
+}
+const proveedorGoogle = new GoogleAuthProvider();
+
+async function manejarCredencialGoogle(respuesta) {
+    const msg = document.getElementById('loginEstadoMsg');
+    if (msg) msg.textContent = '';
+    try {
+        const credential = GoogleAuthProvider.credential(respuesta.credential);
+        await signInWithCredential(auth, credential);
+    } catch (e) {
+        console.error(e);
+        if (msg) msg.textContent = 'No se pudo iniciar sesión. Intenta de nuevo.';
+    }
+}
+window.manejarCredencialGoogle = manejarCredencialGoogle;
+
+function inicializarGoogleIdentity() {
+    const boton = document.getElementById('googleButtonDiv');
+    const fallback = document.getElementById('btnLoginGoogle');
+    if (!window.google || !window.google.accounts || !window.google.accounts.id) {
+        if (fallback) fallback.style.display = 'block';
+        return;
+    }
+    try {
+        google.accounts.id.initialize({
+            client_id: GIS_CLIENT_ID,
+            callback: manejarCredencialGoogle,
+            auto_select: false,
+            ux_mode: 'popup'
+        });
+        if (boton) {
+            google.accounts.id.renderButton(boton, {
+                type: 'standard', theme: 'filled_blue', size: 'large',
+                text: 'continue_with', shape: 'rectangular', width: 300
+            });
+        }
+    } catch (e) {
+        console.error(e);
+        if (fallback) fallback.style.display = 'block';
+    }
+}
+if (window.google && window.google.accounts && window.google.accounts.id) {
+    inicializarGoogleIdentity();
+} else {
+    window.addEventListener('load', inicializarGoogleIdentity);
+}
+
+// If running against the emulator, show emulator login UI and wire email/password handlers
+if (USE_EMULATOR) {
+    const emBox = document.getElementById('emulatorLogin');
+    const emMsg = document.getElementById('emMsg');
+    if (emBox) emBox.style.display = 'block';
+
+    const emSignUp = document.getElementById('btnEmSignUp');
+    const emSignIn = document.getElementById('btnEmSignIn');
+    const emEmail = document.getElementById('emEmail');
+    const emPass = document.getElementById('emPass');
+
+    if (emSignUp) emSignUp.addEventListener('click', async () => {
+        try {
+            emMsg.textContent = 'Creando cuenta…';
+            await import('https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js').then(m => {
+                const { getAuth, createUserWithEmailAndPassword } = m;
+                const authClient = getAuth();
+                createUserWithEmailAndPassword(authClient, emEmail.value, emPass.value).then(() => { emMsg.textContent = 'Cuenta creada.'; }).catch(e => { emMsg.textContent = e.message; });
+            });
+        } catch (e) { console.error(e); if (emMsg) emMsg.textContent = e.message || 'Error'; }
+    });
+
+    if (emSignIn) emSignIn.addEventListener('click', async () => {
+        try {
+            emMsg.textContent = 'Iniciando…';
+            await import('https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js').then(m => {
+                const { getAuth, signInWithEmailAndPassword } = m;
+                const authClient = getAuth();
+                signInWithEmailAndPassword(authClient, emEmail.value, emPass.value).then(() => { emMsg.textContent = 'Sesión iniciada.'; }).catch(e => { emMsg.textContent = e.message; });
+            });
+        } catch (e) { console.error(e); if (emMsg) emMsg.textContent = e.message || 'Error'; }
+    });
+}
+
+const LS_RAMOS = 'malla_unif_ramos';
+const LS_CARRERA = 'malla_unif_carrera_activa';
+const LS_PREFIX_ESTADO = 'malla_unif_estado_';
+const LS_PREFIX_PREREQ = 'malla_unif_prereq_';
+const LS_PREFIX_LINK = 'malla_unif_link_';
+const LS_UID_DUENO = 'malla_unif_uid_dueno';
+
+let usuarioActual = null;
+let tokenSesionActual = 0;
+let ultimaVersionConocida = null;
+let unsubscribeNube = null;
+let timerSincronizacion = null;
+let aplicandoDesdeNube = false;
+
+function cargarJSONLocal(key, fallback) {
+    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+    catch (e) { return fallback; }
+}
+function guardarJSONLocal(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+function recolectarEstadoCompleto() {
+    const estados = {}, prereqs = {}, links = {};
+    Object.keys(localStorage).forEach(key => {
+        if (key.startsWith(LS_PREFIX_ESTADO)) estados[key.replace(LS_PREFIX_ESTADO, '')] = cargarJSONLocal(key, {});
+        else if (key.startsWith(LS_PREFIX_PREREQ)) prereqs[key.replace(LS_PREFIX_PREREQ, '')] = cargarJSONLocal(key, {});
+        else if (key.startsWith(LS_PREFIX_LINK)) links[key.replace(LS_PREFIX_LINK, '')] = cargarJSONLocal(key, {});
+    });
+    return {
+        ramos: cargarJSONLocal(LS_RAMOS, []),
+        carreraActiva: localStorage.getItem(LS_CARRERA) || 'sin_asignar',
+        estados, prereqs, links,
+        actualizadoEn: Date.now()
+    };
+}
+
+function limpiarEstadoLocal() {
+    localStorage.removeItem(LS_RAMOS);
+    localStorage.removeItem(LS_CARRERA);
+    Object.keys(localStorage).forEach(key => {
+        if (key.startsWith(LS_PREFIX_ESTADO) || key.startsWith(LS_PREFIX_PREREQ) || key.startsWith(LS_PREFIX_LINK)) {
+            localStorage.removeItem(key);
+        }
+    });
+    if (window.recargarRamosDesdeStorage) window.recargarRamosDesdeStorage();
+    if (window.recargarCarreraDesdeStorage) window.recargarCarreraDesdeStorage();
+}
+
+function aplicarEstadoCompleto(data) {
+    if (!data) return;
+    aplicandoDesdeNube = true;
+
+    guardarJSONLocal(LS_RAMOS, data.ramos || []);
+    localStorage.setItem(LS_CARRERA, data.carreraActiva || 'sin_asignar');
+
+    Object.keys(localStorage).forEach(key => {
+        if (key.startsWith(LS_PREFIX_ESTADO) || key.startsWith(LS_PREFIX_PREREQ) || key.startsWith(LS_PREFIX_LINK)) {
+            localStorage.removeItem(key);
+        }
+    });
+    Object.entries(data.estados || {}).forEach(([carreraId, val]) => guardarJSONLocal(LS_PREFIX_ESTADO + carreraId, val));
+    Object.entries(data.prereqs || {}).forEach(([carreraId, val]) => guardarJSONLocal(LS_PREFIX_PREREQ + carreraId, val));
+    Object.entries(data.links || {}).forEach(([carreraId, val]) => guardarJSONLocal(LS_PREFIX_LINK + carreraId, val));
+
+    if (window.recargarRamosDesdeStorage) window.recargarRamosDesdeStorage();
+    if (window.recargarCarreraDesdeStorage) window.recargarCarreraDesdeStorage();
+
+    aplicandoDesdeNube = false;
+}
+
+function mostrarEstadoSync(texto, esError) {
+    const el = document.getElementById('syncEstado');
+    if (!el) return;
+    el.textContent = texto;
+    el.classList.toggle('sync-error', !!esError);
+    let btnRetry = document.getElementById('syncRetryBtn');
+    if (esError) {
+        if (!btnRetry) {
+            btnRetry = document.createElement('button');
+            btnRetry.id = 'syncRetryBtn';
+            btnRetry.type = 'button';
+            btnRetry.className = 'sync-retry-btn';
+            btnRetry.textContent = 'Reintentar';
+            btnRetry.onclick = () => { if (usuarioActual) onAuthStateChanged(auth, () => {}); location.reload(); };
+            el.insertAdjacentElement('afterend', btnRetry);
+        }
+    } else if (btnRetry) {
+        btnRetry.remove();
+    }
+}
+
+function programarSincronizacionNube() {
+    if (!usuarioActual || aplicandoDesdeNube) return;
+    mostrarEstadoSync('Guardando…');
+    clearTimeout(timerSincronizacion);
+    timerSincronizacion = setTimeout(() => {
+        timerSincronizacion = null;
+        subirEstadoActual();
+    }, 1200);
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushSincronizacionPendiente();
+});
+window.addEventListener('pagehide', flushSincronizacionPendiente);
+
+function flushSincronizacionPendiente() {
+    if (timerSincronizacion) {
+        clearTimeout(timerSincronizacion);
+        timerSincronizacion = null;
+        subirEstadoActual();
+    }
+}
+
+async function subirEstadoActual() {
+    if (!usuarioActual) return;
+    const refDoc = doc(db, 'usuarios', usuarioActual.uid);
+    try {
+        let huboConflicto = false;
+        await runTransaction(db, async (transaction) => {
+            const snapRemoto = await transaction.get(refDoc);
+            const remoto = snapRemoto.exists() ? snapRemoto.data() : null;
+            if (remoto && ultimaVersionConocida && remoto.actualizadoEn > ultimaVersionConocida) {
+                huboConflicto = true;
+                return;
+            }
+            const nuevoEstado = recolectarEstadoCompleto();
+            transaction.set(refDoc, nuevoEstado);
+            ultimaVersionConocida = nuevoEstado.actualizadoEn;
+        });
+
+        if (huboConflicto) {
+            const snapRemoto = await getDoc(refDoc);
+            if (snapRemoto.exists()) {
+                aplicarEstadoCompleto(snapRemoto.data());
+                ultimaVersionConocida = snapRemoto.data().actualizadoEn || null;
+            }
+            mostrarEstadoSync('Actualizado desde otro dispositivo');
+            return;
+        }
+
+        mostrarEstadoSync('Sincronizado ✓');
+    } catch (e) {
+        console.error(e);
+        mostrarEstadoSync('Error al sincronizar', true);
+    }
+}
+
+window.notificarCambioParaNube = () => programarSincronizacionNube();
+
+function mostrarOverlayLogin(mostrar) {
+    const overlay = document.getElementById('loginOverlay');
+    if (overlay) overlay.style.display = mostrar ? 'flex' : 'none';
+
+    document.documentElement.classList.toggle('sesion-bloqueada', mostrar);
+
+    Array.from(document.body.children).forEach((el) => {
+        if (el === overlay) return;
+        if (mostrar) {
+            el.setAttribute('inert', '');
+        } else {
+            el.removeAttribute('inert');
+        }
+    });
+}
+
+// Exponer control desde UI (delegador) para abrir/cerrar overlay
+window.mostrarOverlayLogin = mostrarOverlayLogin;
+
+// Exponer info de usuario para uso desde UI si es necesario
+window.mostrarInfoUsuario = mostrarInfoUsuario;
+
+// UI wrappers para mostrar mensajes y desactivar botones mientras se procesa
+window.uiRequestSignIn = async function () {
+    const btn = document.getElementById('btnLoginGoogle');
+    const msg = document.getElementById('loginEstadoMsg');
+    if (msg) msg.textContent = 'Iniciando sesión…';
+    if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
+    try {
+        if (typeof window.iniciarSesionConGoogle === 'function') {
+            await window.iniciarSesionConGoogle();
+        }
+    } catch (e) {
+        console.error(e);
+        if (msg) msg.textContent = 'Error iniciando sesión.';
+    } finally {
+        if (btn) { btn.disabled = false; btn.removeAttribute('aria-busy'); }
+    }
+};
+
+window.uiRequestSignOut = async function () {
+    const btn = document.getElementById('btnCerrarSesion');
+    const sync = document.getElementById('syncEstado');
+    if (sync) sync.textContent = 'Cerrando sesión…';
+    if (btn) btn.disabled = true;
+    try {
+        if (typeof window.cerrarSesionUsuario === 'function') await window.cerrarSesionUsuario();
+    } catch (e) {
+        console.error(e);
+        if (sync) sync.textContent = 'Error al cerrar sesión';
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+};
+
+(function () {
+    const origen = document.querySelector('.header-brand');
+    const destino = document.getElementById('ttLogos');
+    if (origen && destino) destino.innerHTML = origen.innerHTML;
+})();
+
+function mostrarInfoUsuario(user) {
+    const cont = document.getElementById('usuarioInfo');
+    if (!cont) return;
+    if (user) {
+        document.getElementById('usuarioFoto').src = user.photoURL || '';
+        document.getElementById('usuarioNombre').textContent = user.displayName || user.email || '';
+        cont.style.display = 'flex';
+        // ocultar botón de login en cabecera si existe
+        const hdrBtn = document.getElementById('btnHeaderLogin'); if (hdrBtn) hdrBtn.style.display = 'none';
+    } else {
+        cont.style.display = 'none';
+        const hdrBtn = document.getElementById('btnHeaderLogin'); if (hdrBtn) hdrBtn.style.display = 'inline-block';
+    }
+}
+
+const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+window.iniciarSesionConGoogle = async () => {
+    const msg = document.getElementById('loginEstadoMsg');
+    if (msg) msg.textContent = '';
+    try {
+        if (esMovil) {
+            await signInWithRedirect(auth, proveedorGoogle);
+            return;
+        }
+        await signInWithPopup(auth, proveedorGoogle);
+    } catch (e) {
+        console.error(e);
+        if (!esMovil) {
+            try {
+                await signInWithRedirect(auth, proveedorGoogle);
+                return;
+            } catch (e2) {
+                console.error(e2);
+            }
+        }
+        if (msg) msg.textContent = 'No se pudo iniciar sesión. Intenta de nuevo.';
+    }
+};
+
+getRedirectResult(auth).catch((e) => {
+    console.error(e);
+    const msg = document.getElementById('loginEstadoMsg');
+    if (msg) msg.textContent = 'No se pudo iniciar sesión. Intenta de nuevo.';
+});
+
+window.cerrarSesionUsuario = async () => {
+    if (unsubscribeNube) { unsubscribeNube(); unsubscribeNube = null; }
+    await signOut(auth);
+};
+
+onAuthStateChanged(auth, async (user) => {
+    const miToken = ++tokenSesionActual;
+    usuarioActual = user;
+    if (unsubscribeNube) { unsubscribeNube(); unsubscribeNube = null; }
+
+    if (!user) {
+        mostrarOverlayLogin(true);
+        mostrarInfoUsuario(null);
+        return;
+    }
+
+    mostrarInfoUsuario(user);
+    mostrarEstadoSync('Cargando…');
+
+    const uidDueno = localStorage.getItem(LS_UID_DUENO);
+    if (uidDueno && uidDueno !== user.uid) {
+        limpiarEstadoLocal();
+    }
+
+    const refDoc = doc(db, 'usuarios', user.uid);
+    let snap;
+    try {
+        snap = await getDoc(refDoc);
+    } catch (e) {
+        console.error(e);
+        if (miToken !== tokenSesionActual) return;
+        mostrarEstadoSync('Error de conexión', true);
+        mostrarOverlayLogin(false);
+        return;
+    }
+
+    if (miToken !== tokenSesionActual) return;
+
+    let esPrimeraVezEstaCuenta = false;
+    if (snap.exists()) {
+        aplicarEstadoCompleto(snap.data());
+        ultimaVersionConocida = snap.data().actualizadoEn || null;
+    } else {
+        esPrimeraVezEstaCuenta = true;
+        await subirEstadoActual();
+        if (miToken !== tokenSesionActual) return;
+    }
+    localStorage.setItem(LS_UID_DUENO, user.uid);
+    mostrarEstadoSync('Sincronizado ✓');
+    mostrarOverlayLogin(false);
+
+    if (esPrimeraVezEstaCuenta) {
+        setTimeout(() => {
+            const modal = document.getElementById('tutorialModal');
+            if (modal) modal.style.display = 'flex';
+        }, 400);
+    }
+
+    unsubscribeNube = onSnapshot(refDoc, (docSnap) => {
+        if (miToken !== tokenSesionActual) return;
+        if (!docSnap.exists()) return;
+        if (docSnap.metadata.hasPendingWrites) return;
+
+        const actualizadoEnRemoto = docSnap.data().actualizadoEn || null;
+        if (actualizadoEnRemoto && actualizadoEnRemoto === ultimaVersionConocida) return;
+
+        aplicarEstadoCompleto(docSnap.data());
+        ultimaVersionConocida = actualizadoEnRemoto;
+        mostrarEstadoSync('Actualizado desde otro dispositivo');
+    });
+});

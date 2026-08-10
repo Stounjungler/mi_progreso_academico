@@ -1,0 +1,17 @@
+{
+  "name": "mi-progreso-academico",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build:config": "node scripts/write-config.js",
+    "build": "npm run build:config",
+    "serve": "npx http-server -c-1 .",
+    "smoke-test": "node scripts/smoke-test.js",
+    "emulators:start": "npx firebase emulators:start --only auth,firestore",
+    "test:emulator-auth": "node scripts/test-emulator-auth.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.2.0",
+    "firebase-tools": "^15.26.0"
+  }
+}
