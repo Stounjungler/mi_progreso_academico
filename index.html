@@ -101,7 +101,8 @@
             <h1>Mi Progreso Académico</h1>
             <p>Inicia sesión con tu cuenta de Google para guardar tus notas en la nube y acceder desde cualquier dispositivo.</p>
             <div id="googleButtonDiv" class="google-button-placeholder"></div>
-            <button id="btnLoginGoogle" class="btn btn-ghost hidden" data-action="uiRequestSignIn">Iniciar sesión</button>
+            <button id="btnLoginGoogle" class="btn btn-primary" data-action="uiRequestSignIn" style="width: 100%; margin-top: 12px;">Iniciar sesión con Google</button>
+            <button id="btnModoInvitado" class="btn btn-ghost" style="width: 100%; margin-top: 8px;" onclick="window.mostrarOverlayLogin(false)">Usar en modo local (sin cuenta)</button>
             <!-- Emulator fallback: login por email/password (solo si FIREBASE_USE_EMULATOR=true) -->
             <div id="emulatorLogin" class="emulator-login">
                 <input id="emEmail" type="email" placeholder="test@local.test" class="full-input" />

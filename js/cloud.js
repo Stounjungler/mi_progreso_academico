@@ -59,8 +59,16 @@ window.manejarCredencialGoogle = manejarCredencialGoogle;
 function inicializarGoogleIdentity() {
     const boton = document.getElementById('googleButtonDiv');
     const fallback = document.getElementById('btnLoginGoogle');
-    if (!window.google || !window.google.accounts || !window.google.accounts.id) {
-        if (fallback) fallback.style.display = 'block';
+
+    function mostrarFallback() {
+        if (fallback) {
+            fallback.classList.remove('hidden');
+            fallback.style.display = 'inline-block';
+        }
+    }
+
+    if (!window.google || !window.google.accounts || !window.google.accounts.id || !GIS_CLIENT_ID) {
+        mostrarFallback();
         return;
     }
     try {
@@ -77,8 +85,8 @@ function inicializarGoogleIdentity() {
             });
         }
     } catch (e) {
-        console.error(e);
-        if (fallback) fallback.style.display = 'block';
+        console.error('Google Identity error:', e);
+        mostrarFallback();
     }
 }
 if (window.google && window.google.accounts && window.google.accounts.id) {
