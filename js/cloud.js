@@ -279,21 +279,22 @@ async function subirEstadoActual() {
 window.notificarCambioParaNube = () => programarSincronizacionNube();
 
 function mostrarOverlayLogin(mostrar) {
+    const esVisible = (mostrar === true || mostrar === 'true');
     const overlay = document.getElementById('loginOverlay');
-    if (overlay) overlay.style.display = mostrar ? 'flex' : 'none';
+    if (overlay) overlay.style.display = esVisible ? 'flex' : 'none';
 
-    document.documentElement.classList.toggle('sesion-bloqueada', mostrar);
+    document.documentElement.classList.toggle('sesion-bloqueada', esVisible);
 
     Array.from(document.body.children).forEach((el) => {
         if (el === overlay) return;
-        if (mostrar) {
+        if (esVisible) {
             el.setAttribute('inert', '');
         } else {
             el.removeAttribute('inert');
         }
     });
 
-    if (!mostrar && typeof window.recargarCarreraDesdeStorage === 'function') {
+    if (!esVisible && typeof window.recargarCarreraDesdeStorage === 'function') {
         window.recargarCarreraDesdeStorage();
     }
 }
@@ -362,7 +363,7 @@ const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 window.iniciarSesionConGoogle = async () => {
     const msg = document.getElementById('loginEstadoMsg');
-    if (msg) msg.textContent = '';
+    if (msg) msg.textContent = 'Procesando inicio de sesión...';
     try {
         if (esMovil) {
             await signInWithRedirect(auth, proveedorGoogle);
@@ -370,16 +371,18 @@ window.iniciarSesionConGoogle = async () => {
         }
         await signInWithPopup(auth, proveedorGoogle);
     } catch (e) {
-        console.error(e);
-        if (!esMovil) {
-            try {
-                await signInWithRedirect(auth, proveedorGoogle);
-                return;
-            } catch (e2) {
-                console.error(e2);
-            }
+        console.error('Firebase Auth Error:', e);
+        let mensajeError = 'No se pudo iniciar sesión. Intenta de nuevo.';
+        if (e && e.code === 'auth/unauthorized-domain') {
+            mensajeError = `Dominio no autorizado (${window.location.hostname}). Añádelo en Firebase Console > Auth > Settings > Authorized domains.`;
+        } else if (e && e.code === 'auth/popup-closed-by-user') {
+            mensajeError = 'Ventana de inicio de sesión cerrada antes de completar.';
+        } else if (e && e.code === 'auth/operation-not-allowed') {
+            mensajeError = 'El proveedor de Google no está habilitado en tu consola de Firebase.';
+        } else if (e && e.message) {
+            mensajeError = e.message;
         }
-        if (msg) msg.textContent = 'No se pudo iniciar sesión. Intenta de nuevo.';
+        if (msg) msg.textContent = mensajeError;
     }
 };
 
