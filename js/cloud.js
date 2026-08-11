@@ -311,6 +311,22 @@ function mostrarOverlayLogin(mostrar) {
 // Exponer control desde UI (delegador) para abrir/cerrar overlay
 window.mostrarOverlayLogin = mostrarOverlayLogin;
 
+// Función dedicada para entrar en modo invitado (sin cuenta)
+// Se llama desde data-action="entrarModoInvitado" en el botón del login overlay
+window.entrarModoInvitado = function() {
+    window.modoInvitadoActivo = true;
+    const overlay = document.getElementById('loginOverlay');
+    if (overlay) overlay.style.setProperty('display', 'none', 'important');
+    document.documentElement.classList.remove('sesion-bloqueada');
+    document.querySelectorAll('[inert]').forEach(el => el.removeAttribute('inert'));
+    if (typeof window.recargarCarreraDesdeStorage === 'function') {
+        window.recargarCarreraDesdeStorage();
+    }
+    const msg = document.getElementById('loginEstadoMsg');
+    if (msg) msg.textContent = '';
+    console.log('Modo invitado activado');
+};
+
 // Exponer info de usuario para uso desde UI si es necesario
 window.mostrarInfoUsuario = mostrarInfoUsuario;
 
@@ -395,10 +411,16 @@ window.iniciarSesionConGoogle = async () => {
     }
 };
 
-getRedirectResult(auth).catch((e) => {
-    console.error(e);
-    const msg = document.getElementById('loginEstadoMsg');
-    if (msg) msg.textContent = 'No se pudo iniciar sesión. Intenta de nuevo.';
+getRedirectResult(auth).then((result) => {
+    // Solo actuar si hay un resultado real de redirect
+    if (result && result.user) {
+        console.log('Redirect login exitoso:', result.user.email);
+    }
+}).catch((e) => {
+    // Solo mostrar error si hubo un intento de redirect real (no en cargas normales)
+    if (e && e.code && e.code !== 'auth/popup-closed-by-user') {
+        console.warn('getRedirectResult error (puede ser normal en carga inicial):', e.code);
+    }
 });
 
 window.cerrarSesionUsuario = async () => {

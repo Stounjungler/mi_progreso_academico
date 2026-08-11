@@ -319,6 +319,7 @@ document.addEventListener('click', (e) => {
             case 'cerrar-confirmar-restaurar': if (typeof window.cerrarConfirmarRestaurarModal === 'function') window.cerrarConfirmarRestaurarModal(); break;
             case 'confirmar-restaurar-respaldo': if (typeof window.confirmarRestaurarRespaldo === 'function') window.confirmarRestaurarRespaldo(); break;
             case 'cerrar-prereq': if (typeof window.cerrarPrereqModal === 'function') window.cerrarPrereqModal(); break;
+            case 'entrarModoInvitado': if (typeof window.entrarModoInvitado === 'function') window.entrarModoInvitado(); break;
             default:
                 // generic: call a global function if exists
                 if (action && typeof window[action] === 'function') {
