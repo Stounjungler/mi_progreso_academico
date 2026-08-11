@@ -181,8 +181,7 @@ window.recargarCarreraDesdeStorage = () => {
     renderMalla();
 };
 
-// Renderizar la malla al inicializar la app
-renderMalla();
+// Nota: renderMalla() se invoca más abajo, después de declarar contenidoMalla (línea ~412+).
 
 /* ---- Prerrequisitos ---- */
 function ramosAnteriores(carreraId, semestreIdx) {
@@ -410,6 +409,9 @@ function closeModal(modalId) {
 
 /* ---- Render de la malla ---- */
 const contenidoMalla = document.getElementById('contenidoMalla');
+
+// Renderizar la malla al inicializar (ahora que contenidoMalla ya está declarada)
+renderMalla();
 
 function estadoResumenRamo(ramoId) {
     const ramoCard = ramos.find(r => r.id === ramoId);
