@@ -102,7 +102,7 @@
             <p>Inicia sesión con tu cuenta de Google para guardar tus notas en la nube y acceder desde cualquier dispositivo.</p>
             <div id="googleButtonDiv" class="google-button-placeholder"></div>
             <button id="btnLoginGoogle" class="btn btn-primary" data-action="uiRequestSignIn" style="width: 100%; margin-top: 12px;">Iniciar sesión con Google</button>
-            <button id="btnModoInvitado" class="btn btn-ghost" style="width: 100%; margin-top: 8px;" data-action="mostrarOverlayLogin:false">Usar en modo local (sin cuenta)</button>
+            <button id="btnModoInvitado" class="btn btn-ghost" style="width: 100%; margin-top: 8px;" data-action="mostrarOverlayLogin:false" onclick="if(window.mostrarOverlayLogin) window.mostrarOverlayLogin(false); document.getElementById('loginOverlay').style.setProperty('display','none','important'); document.documentElement.classList.remove('sesion-bloqueada'); document.querySelectorAll('[inert]').forEach(e => e.removeAttribute('inert')); if(window.recargarCarreraDesdeStorage) window.recargarCarreraDesdeStorage();">Usar en modo local (sin cuenta)</button>
             <!-- Emulator fallback: login por email/password (solo si FIREBASE_USE_EMULATOR=true) -->
             <div id="emulatorLogin" class="emulator-login">
                 <input id="emEmail" type="email" placeholder="test@local.test" class="full-input" />

@@ -278,10 +278,19 @@ async function subirEstadoActual() {
 
 window.notificarCambioParaNube = () => programarSincronizacionNube();
 
+window.modoInvitadoActivo = false;
+
 function mostrarOverlayLogin(mostrar) {
     const esVisible = (mostrar === true || mostrar === 'true');
+    if (!esVisible) {
+        window.modoInvitadoActivo = true;
+    } else {
+        window.modoInvitadoActivo = false;
+    }
     const overlay = document.getElementById('loginOverlay');
-    if (overlay) overlay.style.display = esVisible ? 'flex' : 'none';
+    if (overlay) {
+        overlay.style.setProperty('display', esVisible ? 'flex' : 'none', 'important');
+    }
 
     document.documentElement.classList.toggle('sesion-bloqueada', esVisible);
 
@@ -393,8 +402,10 @@ getRedirectResult(auth).catch((e) => {
 });
 
 window.cerrarSesionUsuario = async () => {
+    window.modoInvitadoActivo = false;
     if (unsubscribeNube) { unsubscribeNube(); unsubscribeNube = null; }
     await signOut(auth);
+    mostrarOverlayLogin(true);
 };
 
 onAuthStateChanged(auth, async (user) => {
@@ -403,11 +414,14 @@ onAuthStateChanged(auth, async (user) => {
     if (unsubscribeNube) { unsubscribeNube(); unsubscribeNube = null; }
 
     if (!user) {
-        mostrarOverlayLogin(true);
+        if (!window.modoInvitadoActivo) {
+            mostrarOverlayLogin(true);
+        }
         mostrarInfoUsuario(null);
         return;
     }
 
+    window.modoInvitadoActivo = false;
     mostrarInfoUsuario(user);
     mostrarEstadoSync('Cargando…');
 
