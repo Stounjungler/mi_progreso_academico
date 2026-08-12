@@ -457,10 +457,12 @@ onAuthStateChanged(auth, async (user) => {
     try {
         snap = await getDoc(refDoc);
     } catch (e) {
-        console.error(e);
+        console.warn('Firestore no disponible (puede que no esté creada la DB):', e.message || e);
         if (miToken !== tokenSesionActual) return;
-        mostrarEstadoSync('Error de conexión', true);
+        mostrarEstadoSync('Sin sincronización (modo offline)', false);
+        // Aún así cerrar el overlay y dejar usar la app localmente
         mostrarOverlayLogin(false);
+        localStorage.setItem(LS_UID_DUENO, user.uid);
         return;
     }
 
