@@ -374,7 +374,7 @@ window.uiRequestSignIn = async function () {
 };
 
 window.uiRequestSignOut = async function () {
-    const btn = document.getElementById('btnCerrarSesion');
+    const btn = document.getElementById('btnGestionarCuenta');
     const sync = document.getElementById('syncEstado');
     if (sync) sync.textContent = 'Cerrando sesión…';
     if (btn) btn.disabled = true;
@@ -385,6 +385,18 @@ window.uiRequestSignOut = async function () {
         if (sync) sync.textContent = 'Error al cerrar sesión';
     } finally {
         if (btn) btn.disabled = false;
+    }
+};
+
+// Botón siempre visible en el header para gestionar la cuenta:
+// - con sesión activa cierra la sesión y muestra el overlay para cambiar de cuenta
+//   o entrar en modo invitado;
+// - sin sesión (modo invitado) muestra directamente el overlay de login.
+window.uiGestionarCuenta = function () {
+    if (usuarioActual) {
+        window.uiRequestSignOut();
+    } else {
+        mostrarOverlayLogin(true);
     }
 };
 
@@ -400,12 +412,11 @@ function mostrarInfoUsuario(user) {
     if (user) {
         document.getElementById('usuarioFoto').src = user.photoURL || '';
         document.getElementById('usuarioNombre').textContent = user.displayName || user.email || '';
+        cont.classList.remove('hidden');
         cont.style.display = 'flex';
-        // ocultar botón de login en cabecera si existe
-        const hdrBtn = document.getElementById('btnHeaderLogin'); if (hdrBtn) hdrBtn.style.display = 'none';
     } else {
+        cont.classList.add('hidden');
         cont.style.display = 'none';
-        const hdrBtn = document.getElementById('btnHeaderLogin'); if (hdrBtn) hdrBtn.style.display = 'inline-block';
     }
 }
 

@@ -727,6 +727,8 @@ let ramos = cargarJSON(LS_RAMOS, []);
 ramos.forEach(r => { if (r.tieneExamen === undefined) r.tieneExamen = true; if (r.promedioEjManual === undefined) r.promedioEjManual = ''; });
 
 // Renderizar la malla por primera vez (ahora `ramos` ya está inicializado).
+// NOTA: `renderRamos()` no se llama aquí porque aún no están definidas funciones
+// que usa (ej. window.actualizarVistaPesosCat); se invoca al final del script.
 renderMalla();
 
 window.guardarEnStorage = (forzarSnapshot) => {
@@ -1747,7 +1749,7 @@ document.addEventListener('input', (e) => {
     }, 150);
 });
 
-window.renderRamos = () => {
+function renderRamos() {
     const grid = document.getElementById('grid-ramos');
 
     const activeEl = document.activeElement;
@@ -1786,7 +1788,7 @@ window.renderRamos = () => {
             }
         }
     }
-};
+}
 
 /* ---- Puentes para sincronización en la nube (usados por el módulo de Firebase) ----
    Estas funciones permiten que el script de autenticación/Firestore recargue el
@@ -1797,3 +1799,7 @@ window.recargarRamosDesdeStorage = () => {
     ramos.forEach(r => { if (r.tieneExamen === undefined) r.tieneExamen = true; if (r.promedioEjManual === undefined) r.promedioEjManual = ''; });
     renderRamos();
 };
+
+// Render inicial de la pestaña "Mis Ramos": aquí todas las funciones que usa ya
+// están definidas (hoisted o asignadas a window), a diferencia del boot.
+renderRamos();
