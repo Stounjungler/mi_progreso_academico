@@ -426,6 +426,7 @@ window.iniciarSesionConGoogle = async () => {
     const msg = document.getElementById('loginEstadoMsg');
     if (msg) msg.textContent = 'Procesando inicio de sesión...';
     try {
+        // En móvil el popup falla seguido (in-app browsers, COOP), por eso redirect.
         if (esMovil) {
             await signInWithRedirect(auth, proveedorGoogle);
             return;
@@ -437,7 +438,18 @@ window.iniciarSesionConGoogle = async () => {
         if (e && e.code === 'auth/unauthorized-domain') {
             mensajeError = `Dominio no autorizado (${window.location.hostname}). Añádelo en Firebase Console > Auth > Settings > Authorized domains.`;
         } else if (e && e.code === 'auth/popup-closed-by-user') {
-            mensajeError = 'Ventana de inicio de sesión cerrada antes de completar.';
+            // El popup se cierra solo por restricciones del navegador (COOP/COEP).
+            // Reintentar con redirect, que no depende del popup.
+            mensajeError = 'El navegador bloqueó el popup. Reintentando con redirección…';
+            if (msg) msg.textContent = mensajeError;
+            try {
+                await signInWithRedirect(auth, proveedorGoogle);
+            } catch (e2) {
+                console.error('Redirect Auth Error:', e2);
+                mensajeError = e2 && e2.code === 'auth/unauthorized-domain'
+                    ? `Dominio no autorizado (${window.location.hostname}). Añádelo en Firebase Console > Auth > Settings > Authorized domains.`
+                    : 'No se pudo iniciar sesión. Intenta de nuevo.';
+            }
         } else if (e && e.code === 'auth/operation-not-allowed') {
             mensajeError = 'El proveedor de Google no está habilitado en tu consola de Firebase.';
         } else if (e && e.message) {
