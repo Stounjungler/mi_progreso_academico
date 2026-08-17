@@ -182,7 +182,7 @@ selectCarrera.onchange = () => {
     modoPrereq = false;
     prereqEditandoId = null;
     const modalPrereq = document.getElementById('prereqModal');
-    if (modalPrereq) modalPrereq.style.display = 'none';
+    if (modalPrereq && modalPrereq.style.display !== 'none') cerrarModalSegun('prereqModal');
     renderMalla();
 };
 
@@ -249,12 +249,12 @@ window.abrirPrereqModal = (carreraId, ramoId) => {
     const nombreRamo = (CARRERAS[carreraId].semestres.flat().find(r => r.id === ramoId) || {}).nombre || '';
     document.getElementById('prereqModalTitulo').textContent = nombreRamo;
     renderPrereqModalLista(carreraId, ramoId);
-    document.getElementById('prereqModal').style.display = 'flex';
+    openModal('prereqModal');
 };
 
 window.cerrarPrereqModal = (event) => {
     if (event && event.target.id !== 'prereqModal') return;
-    document.getElementById('prereqModal').style.display = 'none';
+    closeModal('prereqModal');
     prereqEditandoId = null;
 };
 
@@ -311,17 +311,7 @@ document.addEventListener('click', (e) => {
             case 'stop-prop': e.stopPropagation(); break;
             case 'overlay-click': {
                 const target = el.getAttribute('data-target');
-                if (e.target && e.target.id === target) {
-                    if (target === 'prereqModal' && typeof window.cerrarPrereqModal === 'function') {
-                        window.cerrarPrereqModal();
-                    } else if (target === 'confirmarRestaurarModal' && typeof window.cerrarConfirmarRestaurarModal === 'function') {
-                        window.cerrarConfirmarRestaurarModal();
-                    } else if (target === 'confirmarEliminarModal' && typeof window.cerrarConfirmarEliminarModal === 'function') {
-                        window.cerrarConfirmarEliminarModal();
-                    } else {
-                        closeModal(target);
-                    }
-                }
+                if (e.target && e.target.id === target) cerrarModalSegun(target);
                 break;
             }
             case 'open-malla-modal': e.preventDefault(); openModal('mallaOficialModal'); break;
@@ -354,7 +344,8 @@ document.addEventListener('click', (e) => {
     if (e.target && e.target.id === 'btnPrereq') {
         modoPrereq = !modoPrereq;
         prereqEditandoId = null;
-        document.getElementById('prereqModal').style.display = 'none';
+        const modalPrereq = document.getElementById('prereqModal');
+        if (modalPrereq && modalPrereq.style.display !== 'none') cerrarModalSegun('prereqModal');
         renderMalla();
     }
 });
@@ -376,11 +367,20 @@ document.addEventListener('click', (e) => {
 });
 
 // Modal helpers: apertura, cierre y focus-trap para accesibilidad
+// Cierra un modal usando su función dedicada (para resetear estado interno) si
+// existe; si no, usa closeModal genérico.
+function cerrarModalSegun(modalId) {
+    if (modalId === 'prereqModal' && typeof window.cerrarPrereqModal === 'function') window.cerrarPrereqModal();
+    else if (modalId === 'confirmarRestaurarModal' && typeof window.cerrarConfirmarRestaurarModal === 'function') window.cerrarConfirmarRestaurarModal();
+    else if (modalId === 'confirmarEliminarModal' && typeof window.cerrarConfirmarEliminarModal === 'function') window.cerrarConfirmarEliminarModal();
+    else closeModal(modalId);
+}
+
 // Cierra cualquier modal visible con la tecla Escape (accesibilidad de teclado).
 document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     document.querySelectorAll('.modal-overlay').forEach(overlay => {
-        if (getComputedStyle(overlay).display !== 'none') closeModal(overlay.id);
+        if (getComputedStyle(overlay).display !== 'none') cerrarModalSegun(overlay.id);
     });
 });
 
@@ -769,7 +769,7 @@ window.manejarArchivoRespaldo = (el) => {
         if (!estructuraValida) { alert('El archivo no tiene la estructura esperada de un respaldo de "Mis Ramos".'); return; }
         _respaldoPendiente = datos;
         document.getElementById('confirmarRestaurarCantidad').textContent = datos.length;
-        document.getElementById('confirmarRestaurarModal').style.display = 'flex';
+        openModal('confirmarRestaurarModal');
     };
     reader.onerror = () => alert('No se pudo leer el archivo seleccionado.');
     reader.readAsText(file);
@@ -777,7 +777,7 @@ window.manejarArchivoRespaldo = (el) => {
 
 window.cerrarConfirmarRestaurarModal = (event) => {
     if (event && event.target.id !== 'confirmarRestaurarModal') return;
-    document.getElementById('confirmarRestaurarModal').style.display = 'none';
+    closeModal('confirmarRestaurarModal');
     _respaldoPendiente = null;
 };
 
@@ -788,7 +788,7 @@ window.confirmarRestaurarRespaldo = () => {
     _respaldoPendiente = null;
     guardarEnStorage(true);
     renderRamos();
-    document.getElementById('confirmarRestaurarModal').style.display = 'none';
+    closeModal('confirmarRestaurarModal');
 };
 
 function pesosIguales(n) {
@@ -848,7 +848,7 @@ window.eliminarRamo = (id) => {
     if (!r) return;
     _idRamoAEliminar = id;
     document.getElementById('confirmarEliminarNombre').textContent = r.nombre;
-    document.getElementById('confirmarEliminarModal').style.display = 'flex';
+    openModal('confirmarEliminarModal');
 };
 window.confirmarEliminarRamo = () => {
     if (!_idRamoAEliminar) return;
@@ -873,7 +873,7 @@ window.confirmarEliminarRamo = () => {
 window.cerrarConfirmarEliminarModal = (event) => {
     if (event && event.target.id !== 'confirmarEliminarModal') return;
     _idRamoAEliminar = null;
-    document.getElementById('confirmarEliminarModal').style.display = 'none';
+    closeModal('confirmarEliminarModal');
 };
 
 window.actualizarNombre = (id, el) => {
