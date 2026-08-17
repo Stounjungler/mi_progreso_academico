@@ -57,40 +57,245 @@
         <section id="panel-ramos" class="panel">
             <div class="toolbar">
                 <div class="toolbar-actions">
-                    <button id="btnAgregarRamo" class="btn">➕ Agregar Ramo</button>
-                    <button id="btnExportarPDF" class="btn btn-ghost">Exportar PDF</button>
+                    <button id="btnAgregarRamo" class="btn" data-action="agregarRamoManual">➕ Agregar Ramo</button>
+                    <button class="btn btn-ghost" data-action="descargarRespaldo" title="Descarga un archivo .json con todos tus ramos">⬇️ Descargar respaldo</button>
+                    <button class="btn btn-ghost" data-action="activarInputRespaldo" title="Restaura tus ramos desde un archivo .json de respaldo">⬆️ Restaurar respaldo</button>
+                    <input type="file" id="inputRespaldo" accept="application/json,.json" class="hidden" data-action-change="manejarArchivoRespaldo">
                 </div>
             </div>
-            <div id="listaRamos"></div>
+            <div id="grid-ramos" class="grid-ramos"></div>
         </section>
     </main>
 
-    <!-- Modales (mantener ids usados por js/app.js) -->
-    <div id="tutorialModal" class="modal-overlay" aria-hidden="true">
-        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="tutorialTitulo">
-            <h2 id="tutorialTitulo">Guía rápida</h2>
-            <div id="tutorialBody">Contenido del tutorial...</div>
-            <button class="btn btn-primary" id="tutorialCerrar">¡Entendido!</button>
+    <!-- Modales -->
+    <div id="guiaModal" class="modal-overlay" aria-hidden="true" data-action="overlay-click" data-target="guiaModal">
+        <div class="modal-content" data-action="stop-prop">
+            <h2>¿Cómo funciona esto? 📖</h2>
+            <p>Esta app te permite llevar el control de tus ramos, calcular promedios y planificar tu carrera de forma fácil.</p>
+            <ul style="padding-left: 20px; line-height: 1.6; color: var(--text-muted); font-size: 14.5px;">
+                <li><strong style="color:var(--text-main)">Malla Curricular:</strong> Simula notas y ve el impacto en tu PPA.</li>
+                <li><strong style="color:var(--text-main)">Mis Ramos:</strong> Agrega ramos manualmente si tomaste de otras carreras.</li>
+                <li><strong style="color:var(--text-main)">Sincronización:</strong> Todo se guarda en la nube automáticamente al iniciar sesión.</li>
+            </ul>
+            <button class="btn btn-primary" style="width: 100%; margin-top: 6px;" data-action="close-help">¡Entendido!</button>
         </div>
     </div>
 
-    <div id="mallaOficialModal" class="modal-overlay" aria-hidden="true">
-        <div class="modal-content modal-content-img" role="dialog" aria-modal="true" aria-labelledby="mallaOficialTitulo">
+    <div id="tutorialModal" class="modal-overlay" aria-hidden="true" data-action="overlay-click" data-target="tutorialModal">
+        <div class="modal-content modal-content-tutorial" data-action="stop-prop">
+            <div class="tt-close-row">
+                <button class="btn-tema" style="width:36px;height:36px;font-size:16px;" title="Cerrar" data-action="close-tutorial">✕</button>
+            </div>
+            <div class="tt-scroll">
+                <div class="tt-logos" id="ttLogos"></div>
+                <div class="tt-header-text">
+                    <div class="eyebrow">Manual de uso</div>
+                    <h2>Guía Rápida 🎓</h2>
+                    <p>Descubre cómo sacarle el máximo provecho a Mi Progreso Académico con estos simples pasos.</p>
+                </div>
+                
+                <nav class="tt-toc">
+                    <h3>Contenido</h3>
+                    <div class="tt-toc-grid">
+                        <a href="#paso1"><span class="num">1</span> Elegir Carrera</a>
+                        <a href="#paso2"><span class="num">2</span> Modificar Notas</a>
+                        <a href="#paso3"><span class="num">3</span> Estados de Ramo</a>
+                        <a href="#paso4"><span class="num">4</span> Impacto en PPA</a>
+                        <a href="#paso5"><span class="num">5</span> Mis Ramos Extras</a>
+                        <a href="#paso6"><span class="num">6</span> Promedio Estimado</a>
+                        <a href="#paso7"><span class="num">7</span> Guardar en Nube</a>
+                        <a href="#paso8"><span class="num">8</span> Malla Oficial</a>
+                    </div>
+                </nav>
+
+                <section id="paso1" class="tt-step">
+                    <div class="tt-step-head">
+                        <div class="tt-step-num">1</div>
+                        <div class="tt-step-titles">
+                            <h3>Elegir tu Carrera</h3>
+                            <span class="tag tab-malla">Pestaña Malla</span>
+                        </div>
+                    </div>
+                    <div class="tt-body">
+                        <p>Lo primero es seleccionar la carrera de la cual quieres ver la malla interactiva. Arriba, usa el menú desplegable:</p>
+                        <div class="field-demo">
+                            <label>Carrera:</label>
+                            <span class="val">Arquitectura 2025</span>
+                        </div>
+                        <p class="muted">La malla se cargará automáticamente con todos los ramos y semestres oficiales.</p>
+                    </div>
+                </section>
+
+                <section id="paso2" class="tt-step">
+                    <div class="tt-step-head">
+                        <div class="tt-step-num">2</div>
+                        <div class="tt-step-titles">
+                            <h3>Modificar tus Notas</h3>
+                            <span class="tag tab-malla">Pestaña Malla</span>
+                        </div>
+                    </div>
+                    <div class="tt-body">
+                        <p>En cada ramo verás un campo de nota. <strong>Simplemente haz clic y escribe</strong> (ej. 5.5 o 6,0). La aplicación automáticamente:</p>
+                        <ul>
+                            <li>Aprueba el ramo si la nota es <strong>4.0</strong> o mayor.</li>
+                            <li>Desbloquea los ramos siguientes que dependían de este (prerrequisitos).</li>
+                            <li>Actualiza tu PPA y créditos aprobados.</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <section id="paso3" class="tt-step">
+                    <div class="tt-step-head">
+                        <div class="tt-step-num">3</div>
+                        <div class="tt-step-titles">
+                            <h3>Estados de los Ramos</h3>
+                            <span class="tag tab-malla">Pestaña Malla</span>
+                        </div>
+                    </div>
+                    <div class="tt-body">
+                        <p>Al interactuar con la malla, los ramos cambiarán de color para mostrar su estado:</p>
+                        <div class="demo-row">
+                            <span class="demo-chip pendiente"><span class="ic">⚪</span> Pendiente</span>
+                            <span class="demo-chip cursando"><span class="ic">🔵</span> Cursando (nota &lt; 4.0)</span>
+                            <span class="demo-chip aprobado"><span class="ic">✅</span> Aprobado (nota ≥ 4.0)</span>
+                            <span class="demo-chip bloqueado"><span class="ic">🔒</span> Bloqueado (falta pre-req)</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="paso4" class="tt-step">
+                    <div class="tt-step-head">
+                        <div class="tt-step-num">4</div>
+                        <div class="tt-step-titles">
+                            <h3>Impacto en tu PPA</h3>
+                            <span class="tag tab-malla">Pestaña Malla</span>
+                        </div>
+                    </div>
+                    <div class="tt-body">
+                        <p>A medida que agregues notas, el panel lateral derecho mostrará tu progreso en tiempo real:</p>
+                        <div class="result-demo">
+                            <div class="lbl">Promedio (PPA)</div>
+                            <div class="num">5.82</div>
+                            <div class="msg">140 Créditos Aprobados</div>
+                        </div>
+                        <div class="tt-callout tip">
+                            <span class="ic">💡</span>
+                            <div><strong>Tip:</strong> Juega con las notas futuras para saber qué promedio necesitas en los próximos semestres.</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="paso5" class="tt-step">
+                    <div class="tt-step-head">
+                        <div class="tt-step-num">5</div>
+                        <div class="tt-step-titles">
+                            <h3>Agregar Ramos Extras</h3>
+                            <span class="tag tab-ramos">Pestaña Mis Ramos</span>
+                        </div>
+                    </div>
+                    <div class="tt-body">
+                        <p>¿Tomas un ramo que no está en la malla principal (Electivo, OFG)? Cámbate a la pestaña <strong>Mis Ramos</strong>.</p>
+                        <p>Allí puedes hacer clic en <button class="mini-btn primary" tabindex="-1" style="pointer-events:none">➕ Agregar Ramo</button> e ingresar el nombre, nota, y créditos manualmente.</p>
+                    </div>
+                </section>
+
+                <section id="paso6" class="tt-step">
+                    <div class="tt-step-head">
+                        <div class="tt-step-num">6</div>
+                        <div class="tt-step-titles">
+                            <h3>Promedio Global Estimado</h3>
+                            <span class="tag tab-ramos">Pestaña Mis Ramos</span>
+                        </div>
+                    </div>
+                    <div class="tt-body">
+                        <p>Si tienes notas tanto en la <strong>Malla</strong> como en <strong>Mis Ramos</strong>, el sistema calcula un <strong>Promedio Ponderado Combinado</strong>.</p>
+                        <div class="tt-callout">
+                            <span class="ic">ℹ️</span>
+                            <div>Este cálculo suma todos los créditos y notas de ambos lados, dándote tu promedio final real que considera electivos.</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="paso7" class="tt-step">
+                    <div class="tt-step-head">
+                        <div class="tt-step-num">7</div>
+                        <div class="tt-step-titles">
+                            <h3>Guardar en la Nube</h3>
+                            <span class="tag tab-cuenta">Cuenta</span>
+                        </div>
+                    </div>
+                    <div class="tt-body">
+                        <p>Nunca pierdas tu progreso. Haz clic en <strong>Iniciar Sesión</strong> arriba a la derecha usando tu cuenta de Google.</p>
+                        <ul>
+                            <li>Tus notas y ramos se guardan <strong>automáticamente</strong> con cada cambio.</li>
+                            <li>Puedes abrir la app en tu celular y verás tus mismos datos.</li>
+                        </ul>
+                        <div class="tt-callout warn">
+                            <span class="ic">⚠️</span>
+                            <div>Si no inicias sesión, tus datos solo se guardarán temporalmente en tu navegador actual.</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="paso8" class="tt-step">
+                    <div class="tt-step-head">
+                        <div class="tt-step-num">8</div>
+                        <div class="tt-step-titles">
+                            <h3>Ver la Malla Oficial</h3>
+                            <span class="tag tab-malla">Pestaña Malla</span>
+                        </div>
+                    </div>
+                    <div class="tt-body">
+                        <p>Si tienes dudas sobre los prerrequisitos originales o las líneas formativas, busca el botón <button class="mini-btn ghost" tabindex="-1" style="pointer-events:none">Ver Malla Oficial</button> al final de la página para ver el PDF o imagen original de la universidad.</p>
+                    </div>
+                </section>
+
+                <div class="tt-closing">
+                    ¡Eso es todo! Ya estás listo para planificar tu <strong>futuro académico</strong>. 🚀
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="mallaOficialModal" class="modal-overlay" aria-hidden="true" data-action="overlay-click" data-target="mallaOficialModal">
+        <div class="modal-content modal-content-img" role="dialog" aria-modal="true" aria-labelledby="mallaOficialTitulo" data-action="stop-prop">
             <h2 id="mallaOficialTitulo">Malla Oficial 2025 🎓</h2>
             <p class="muted">Revisa aquí la malla curricular original desde donde se precargaron los prerrequisitos.</p>
             <img src="Mallas%20FINARQ/malla-2025.svg" alt="Malla Oficial 2025" loading="lazy">
-            <button class="btn btn-primary" id="mallaOficialCerrar">Cerrar</button>
+            <button class="btn btn-primary" data-action="close-malla-modal">Cerrar</button>
         </div>
     </div>
 
     <div id="confirmarEliminarModal" class="modal-overlay" aria-hidden="true">
         <div class="modal-content" role="dialog" aria-modal="true">
             <h2>Eliminar Ramo 🗑️</h2>
-            <p>¿Estás seguro de eliminar <strong id="confirmarEliminarNombre"></strong>?</p>
+            <p>¿Estás seguro de eliminar <strong id="confirmarEliminarNombre"></strong>? Si estaba vinculado a la malla, ese ramo vuelve a quedar como pendiente. Esta acción no se puede deshacer.</p>
             <div class="dialog-actions">
-                <button class="btn btn-ghost" id="confirmarEliminarCancelar">Cancelar</button>
-                <button class="btn" id="confirmarEliminarAceptar">Eliminar</button>
+                <button class="btn btn-ghost" data-action="cerrar-confirmar-eliminar">Cancelar</button>
+                <button class="btn" data-action="confirmar-eliminar-ramo" style="background:var(--danger); color:white;">Eliminar</button>
             </div>
+        </div>
+    </div>
+
+    <div id="confirmarRestaurarModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-content" role="dialog" aria-modal="true">
+            <h2>Restaurar Respaldo 📂</h2>
+            <p>El archivo seleccionado contiene <strong id="confirmarRestaurarCantidad"></strong> ramo(s). Esto <strong style="color:var(--danger-text);">reemplazará</strong> todos los ramos actuales de "Mis Ramos" por los del respaldo. Esta acción no se puede deshacer.</p>
+            <div class="dialog-actions">
+                <button class="btn btn-ghost" data-action="cerrar-confirmar-restaurar">Cancelar</button>
+                <button class="btn" data-action="confirmar-restaurar-respaldo" style="background:var(--accent); color:white;">Restaurar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="prereqModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-content" role="dialog" aria-modal="true">
+            <h2 id="prereqModalTitulo">Prerrequisitos</h2>
+            <div class="modal-item" style="margin-bottom:0;">
+                <label class="modal-label">Requiere tener aprobado:</label>
+                <div id="prereqModalLista" class="prereq-modal-lista"></div>
+            </div>
+            <button class="btn btn-primary" style="width: 100%; margin-top: 20px;" data-action="cerrar-prereq">Listo</button>
         </div>
     </div>
 
@@ -111,6 +316,15 @@
                 <p id="emMsg" class="login-estado-msg em-msg"></p>
             </div>
             <p id="loginEstadoMsg" class="login-estado-msg"></p>
+        </div>
+
+        <div class="login-card" id="loginCardNavegadorInterno" style="display:none;">
+            <div class="login-logo">⚠️</div>
+            <h1>Abrí esta página en tu navegador</h1>
+            <p>Estás viendo esta página dentro de WhatsApp, Instagram u otra app. Google no permite iniciar sesión desde ahí por seguridad.</p>
+            <p style="margin-top:10px;">Tocá el botón para abrirla en tu navegador (Chrome / Safari):</p>
+            <button id="btnAbrirEnNavegador" class="btn btn-primary" style="width:100%; margin-top:10px;" data-action="abrirEnNavegadorReal">Abrir en el navegador</button>
+            <p style="margin-top:12px; font-size:12px;">Si no pasa nada, tocá los <b>tres puntos ⋮</b> (o el ícono de compartir) arriba a la derecha y elegí <b>"Abrir en el navegador"</b> o "Abrir en Chrome/Safari".</p>
         </div>
     </div>
 
