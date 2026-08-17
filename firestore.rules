@@ -1,0 +1,17 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Colección "usuarios": cada documento pertenece a un usuario autenticado.
+    // Solo el dueño (request.auth.uid == docId) puede leer o escribir su estado.
+    match /usuarios/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Denegar acceso a cualquier otra colección por defecto.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,9 +1,9 @@
 Tareas pendientes en el proyecto "Mi-Progreso-Academico":
 
 1) Integrar y hardenizar Firebase Auth + Firestore (parcial)
+   - [x] Reglas de Firestore versionadas en firestore.rules (solo owner lee/escribe su doc). Falta desplegarlas con: npx firebase deploy --only firestore:rules
    - Finalizar pruebas de flujo popup/redirect en entornos (desktop/móvil).
    - Evitar exponer secretos en el repo: usar variables de entorno en Vercel o mecanismo de reemplazo en build.
-   - Revisar reglas de Firestore para seguridad (solo owner puede leer/escribir su doc).
    - Archivo(s): js/cloud.js (config hardcodeada ahora).
 
 2) Agregar CSP (Content Security Policy) y SRI (Subresource Integrity)
@@ -16,9 +16,7 @@ Tareas pendientes en el proyecto "Mi-Progreso-Academico":
    - Build & deploy pasos, reglas de Firestore recomendadas.
 
 4) QA final y pruebas básicas
-   - Probar en Chrome/Firefox/Safari y móviles.
-   - Verificar comportamiento offline/localStorage y sincronización en varios dispositivos.
-   - Chequear accesibilidad (axe-core), contrastes y navegación teclado.
+   - [ ] Ejecutar el checklist de `QA.md` (flujos críticos por navegador/móvil).
 
 5) Migrar el resto de `onclick`/eventos inline en `varias/versiones_index/` y otros HTML
    - Reemplazar por `data-action` y asegurar delegación cubre todos los casos.

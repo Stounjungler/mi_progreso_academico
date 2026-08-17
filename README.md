@@ -27,17 +27,26 @@ Este documento explica cómo desplegar la app estática en Vercel y configurar l
 
 1. En Firestore Database crea una base en modo 'production' (modo de prueba solo temporalmente).
 
-1. Reglas recomendadas para que cada usuario solo acceda a su documento (Firestore):
+1. Reglas recomendadas para que cada usuario solo acceda a su documento (Firestore): ya vienen en `firestore.rules` (en la raíz del repo). Solo owner puede leer/escribir su doc:
 
 ```js
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /usuarios/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    match /usuarios/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
+```
+
+Despliega las reglas con:
+
+```bash
+npx firebase deploy --only firestore:rules
 ```
 
 1. En Project settings → Web apps → añade una app web y copia la configuración (`apiKey`, `authDomain`, `projectId`, etc.).
