@@ -2,16 +2,16 @@ Tareas pendientes en el proyecto "Mi-Progreso-Academico":
 
 1) Integrar y hardenizar Firebase Auth + Firestore (parcial)
    - Finalizar pruebas de flujo popup/redirect en entornos (desktop/móvil).
-   - Evitar exponer secretos en el repo: usar variables de entorno en Netlify o mecanismo de reemplazo en build.
+   - Evitar exponer secretos en el repo: usar variables de entorno en Vercel o mecanismo de reemplazo en build.
    - Revisar reglas de Firestore para seguridad (solo owner puede leer/escribir su doc).
    - Archivo(s): js/cloud.js (config hardcodeada ahora).
 
 2) Agregar CSP (Content Security Policy) y SRI (Subresource Integrity)
    - Definir política CSP para evitar `unsafe-inline` y permitir solo fuentes/estilos/frames necesarios.
    - Añadir SRI a `vendor/jspdf.umd.min.js` si se sirve desde CDN, y revisar recursos externos (Google Fonts, GIS client).
-   - Archivo(s): index.html, posibles headers en Netlify (_headers).
+   - Archivo(s): index.html, posibles headers en Vercel (vercel.json).
 
-3) Crear `README.md` con pasos de despliegue Netlify + Firebase
+3) Crear `README.md` con pasos de despliegue Vercel + Firebase
    - Instrucciones para configurar variables de entorno (FIREBASE_CONFIG, GIS_CLIENT_ID).
    - Build & deploy pasos, reglas de Firestore recomendadas.
 

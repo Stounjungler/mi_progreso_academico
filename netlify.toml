@@ -1,9 +1,0 @@
-[build]
-  publish = "."
-  command = "npm run build"
-
-# Redirects example (uncomment if needed)
-# [[redirects]]
-#   from = "/admin/*"
-#   to = "/admin/index.html"
-#   status = 200
