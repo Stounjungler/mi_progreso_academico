@@ -142,6 +142,10 @@ let ultimaVersionConocida = null;
 let unsubscribeNube = null;
 let timerSincronizacion = null;
 let aplicandoDesdeNube = false;
+// Se activa cuando Firestore no está disponible (reglas no desplegadas, DB no
+// creada, sin conexión). Evita reintentar sincronización en cada guardado y
+// que la consola se llene de errores 403 repetidos.
+let syncDeshabilitado = false;
 
 function cargarJSONLocal(key, fallback) {
     try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -228,7 +232,7 @@ function mostrarEstadoSync(texto, esError) {
 }
 
 function programarSincronizacionNube() {
-    if (!usuarioActual || aplicandoDesdeNube) return;
+    if (!usuarioActual || aplicandoDesdeNube || syncDeshabilitado) return;
     mostrarEstadoSync('Guardando…');
     clearTimeout(timerSincronizacion);
     timerSincronizacion = setTimeout(() => {
@@ -243,6 +247,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', flushSincronizacionPendiente);
 
 function flushSincronizacionPendiente() {
+    if (syncDeshabilitado) return;
     if (timerSincronizacion) {
         clearTimeout(timerSincronizacion);
         timerSincronizacion = null;
@@ -251,7 +256,7 @@ function flushSincronizacionPendiente() {
 }
 
 async function subirEstadoActual() {
-    if (!usuarioActual) return;
+    if (!usuarioActual || syncDeshabilitado) return;
     const refDoc = doc(db, 'usuarios', usuarioActual.uid);
     try {
         let huboConflicto = false;
@@ -279,6 +284,18 @@ async function subirEstadoActual() {
 
         mostrarEstadoSync('Sincronizado ✓');
     } catch (e) {
+        // Sin Firestore disponible (reglas sin desplegar, DB no creada, red) no
+        // tiene sentido reintentar en cada cambio: se deshabilita la sync y se
+        // avisa una sola vez, para no inundar la consola con 403 repetidos.
+        const esPermiso = e && (e.code === 'permission-denied' || e.code === 'unavailable' || e.code === 'not-found');
+        if (esPermiso) {
+            if (!syncDeshabilitado) {
+                syncDeshabilitado = true;
+                console.warn('Sincronización deshabilitada: Firestore no está disponible (reglas no desplegadas o DB sin crear). La app sigue funcionando en modo local.');
+            }
+            mostrarEstadoSync('Sin sincronización (modo local)', false);
+            return;
+        }
         console.error(e);
         mostrarEstadoSync('Error al sincronizar', true);
     }
@@ -465,9 +482,12 @@ onAuthStateChanged(auth, async (user) => {
     try {
         snap = await getDoc(refDoc);
     } catch (e) {
-        console.warn('Firestore no disponible (puede que no esté creada la DB):', e.message || e);
+        if (!syncDeshabilitado) {
+            syncDeshabilitado = true;
+            console.warn('Firestore no disponible (puede que no esté creada la DB o reglas sin desplegar):', e.message || e);
+        }
         if (miToken !== tokenSesionActual) return;
-        mostrarEstadoSync('Sin sincronización (modo offline)', false);
+        mostrarEstadoSync('Sin sincronización (modo local)', false);
         // Aún así cerrar el overlay y dejar usar la app localmente
         mostrarOverlayLogin(false);
         localStorage.setItem(LS_UID_DUENO, user.uid);
@@ -475,6 +495,7 @@ onAuthStateChanged(auth, async (user) => {
     }
 
     if (miToken !== tokenSesionActual) return;
+    syncDeshabilitado = false;
 
     let esPrimeraVezEstaCuenta = false;
     if (snap.exists()) {
