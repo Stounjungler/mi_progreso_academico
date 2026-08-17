@@ -282,11 +282,11 @@ window.modoInvitadoActivo = false;
 
 function mostrarOverlayLogin(mostrar) {
     const esVisible = (mostrar === true || mostrar === 'true');
-    if (!esVisible) {
-        window.modoInvitadoActivo = true;
-    } else {
-        window.modoInvitadoActivo = false;
-    }
+    // NOTA: no tocar `modoInvitadoActivo` aquí. Ese flag solo lo maneja
+    // entrarModoInvitado (true), onAuthStateChanged con usuario (false) y
+    // cerrarSesionUsuario (false). Antes, mostrarOverlayLogin(false) lo ponía
+    // en true aunque hubiera un usuario logueado, y si la sesión expiraba el
+    // overlay de login nunca volvía a aparecer.
     const overlay = document.getElementById('loginOverlay');
     if (overlay) {
         overlay.style.setProperty('display', esVisible ? 'flex' : 'none', 'important');

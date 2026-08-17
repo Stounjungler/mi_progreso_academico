@@ -34,16 +34,16 @@
             </div>
 
             <button id="btnHeaderLogin" class="btn btn-primary" data-action="mostrarOverlayLogin:true" aria-hidden="false">Iniciar sesión</button>
-            <button id="temaToggleBtn" class="btn-tema" title="Cambiar tema">☀️</button>
-            <button id="btnTutorial" class="btn btn-ghost">📘 Tutorial</button>
-            <button id="btnAyuda" class="btn btn-ghost">❔ Ayuda</button>
+            <button id="temaToggleBtn" class="btn-tema" title="Cambiar tema" data-action="toggleTema">☀️</button>
+            <button id="btnTutorial" class="btn btn-ghost" data-action="open-tutorial">📘 Tutorial</button>
+            <button id="btnAyuda" class="btn btn-ghost" data-action="open-help">❔ Ayuda</button>
         </div>
     </header>
 
     <main class="container" id="appRoot">
         <div class="tabs">
-            <button class="tab-btn activo" id="tabBtnMalla">🎓 Malla Curricular</button>
-            <button class="tab-btn" id="tabBtnRamos">📊 Mis Ramos <span class="tab-badge" id="badgeRamos">0</span></button>
+            <button class="tab-btn activo" id="tabBtnMalla" data-action="cambiarTab:malla">🎓 Malla Curricular</button>
+            <button class="tab-btn" id="tabBtnRamos" data-action="cambiarTab:ramos">📊 Mis Ramos <span class="tab-badge" id="badgeRamos">0</span></button>
         </div>
 
         <section id="panel-malla" class="panel activo">
@@ -266,7 +266,7 @@
         </div>
     </div>
 
-    <div id="confirmarEliminarModal" class="modal-overlay" aria-hidden="true">
+    <div id="confirmarEliminarModal" class="modal-overlay" aria-hidden="true" data-action="overlay-click" data-target="confirmarEliminarModal">
         <div class="modal-content" role="dialog" aria-modal="true">
             <h2>Eliminar Ramo 🗑️</h2>
             <p>¿Estás seguro de eliminar <strong id="confirmarEliminarNombre"></strong>? Si estaba vinculado a la malla, ese ramo vuelve a quedar como pendiente. Esta acción no se puede deshacer.</p>
@@ -277,7 +277,7 @@
         </div>
     </div>
 
-    <div id="confirmarRestaurarModal" class="modal-overlay" aria-hidden="true">
+    <div id="confirmarRestaurarModal" class="modal-overlay" aria-hidden="true" data-action="overlay-click" data-target="confirmarRestaurarModal">
         <div class="modal-content" role="dialog" aria-modal="true">
             <h2>Restaurar Respaldo 📂</h2>
             <p>El archivo seleccionado contiene <strong id="confirmarRestaurarCantidad"></strong> ramo(s). Esto <strong style="color:var(--danger-text);">reemplazará</strong> todos los ramos actuales de "Mis Ramos" por los del respaldo. Esta acción no se puede deshacer.</p>
@@ -288,7 +288,7 @@
         </div>
     </div>
 
-    <div id="prereqModal" class="modal-overlay" aria-hidden="true">
+    <div id="prereqModal" class="modal-overlay" aria-hidden="true" data-action="overlay-click" data-target="prereqModal">
         <div class="modal-content" role="dialog" aria-modal="true">
             <h2 id="prereqModalTitulo">Prerrequisitos</h2>
             <div class="modal-item" style="margin-bottom:0;">

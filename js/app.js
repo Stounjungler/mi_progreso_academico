@@ -124,6 +124,12 @@ function getPrereq(carreraId) {
 function setPrereq(carreraId, obj) { guardarJSON(LS_PREFIX_PREREQ + carreraId, obj); }
 
 /* ---- Tema ---- */
+// Restaurar el tema guardado (lo que persistió toggleTema) antes de actualizar el icono.
+(function () {
+    const temaGuardado = localStorage.getItem('malla_unif_tema');
+    if (temaGuardado === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+})();
 function actualizarIconoTema() {
     const btn = document.getElementById('temaToggleBtn');
     const oscuro = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -300,7 +306,17 @@ document.addEventListener('click', (e) => {
             case 'stop-prop': e.stopPropagation(); break;
             case 'overlay-click': {
                 const target = el.getAttribute('data-target');
-                if (e.target && e.target.id === target) closeModal(target);
+                if (e.target && e.target.id === target) {
+                    if (target === 'prereqModal' && typeof window.cerrarPrereqModal === 'function') {
+                        window.cerrarPrereqModal();
+                    } else if (target === 'confirmarRestaurarModal' && typeof window.cerrarConfirmarRestaurarModal === 'function') {
+                        window.cerrarConfirmarRestaurarModal();
+                    } else if (target === 'confirmarEliminarModal' && typeof window.cerrarConfirmarEliminarModal === 'function') {
+                        window.cerrarConfirmarEliminarModal();
+                    } else {
+                        closeModal(target);
+                    }
+                }
                 break;
             }
             case 'open-malla-modal': e.preventDefault(); openModal('mallaOficialModal'); break;
@@ -427,8 +443,10 @@ function closeModal(modalId) {
 /* ---- Render de la malla ---- */
 const contenidoMalla = document.getElementById('contenidoMalla');
 
-// Renderizar la malla al inicializar (ahora que contenidoMalla ya está declarada)
-renderMalla();
+// NOTA: la malla NO se renderiza aquí. `renderMalla()` accede a `ramos`, que
+// se declara con `let` más abajo (PARTE 2). Llamarla antes dejaría `ramos` en
+// "temporal dead zone" y crashearía todo el script. La invocación inicial se
+// hace justo después de inicializar `ramos`.
 
 function estadoResumenRamo(ramoId) {
     const ramoCard = ramos.find(r => r.id === ramoId);
@@ -646,11 +664,12 @@ function _renderMallaInterno() {
                 const resumen = resumirCard(card);
                 pillHtml = `<span class="estado-pill ${resumen.clase}">${resumen.texto}</span>`;
             }
+            const botonEditar = card ? `<button class="btn btn-ghost btn-small" data-action="irARamo:${encodeURIComponent(cardId)}">Editar notas →</button>` : '';
             return `<div class="cursando-item">
                 <div><div class="nombre">${r.nombre}</div><div class="tipo">${card ? etiquetaTipo(card.tipoRamo) : ''}</div></div>
                 <div class="card-action-row">
                     ${pillHtml}
-                    <button class="btn btn-ghost btn-small" data-action="irARamo:${encodeURIComponent(cardId)}">Editar notas →</button>
+                    ${botonEditar}
                 </div>
             </div>`;
         }).join('') + `</div>`;
@@ -701,6 +720,9 @@ function resumirCard(ramoObj) {
 const LS_RAMOS = 'malla_unif_ramos';
 let ramos = cargarJSON(LS_RAMOS, []);
 ramos.forEach(r => { if (r.tieneExamen === undefined) r.tieneExamen = true; if (r.promedioEjManual === undefined) r.promedioEjManual = ''; });
+
+// Renderizar la malla por primera vez (ahora `ramos` ya está inicializado).
+renderMalla();
 
 window.guardarEnStorage = (forzarSnapshot) => {
     guardarJSON(LS_RAMOS, ramos);
@@ -825,6 +847,7 @@ window.eliminarRamo = (id) => {
 };
 window.confirmarEliminarRamo = () => {
     if (!_idRamoAEliminar) return;
+    delete _respaldoCantidad[_idRamoAEliminar];
     ramos = ramos.filter(r => r.id !== _idRamoAEliminar);
     // Si ese ramo estaba vinculado a algún nodo de la malla, ese nodo vuelve a "pendiente".
     Object.keys(localStorage).filter(k => k.startsWith(LS_PREFIX_LINK)).forEach(key => {
@@ -879,13 +902,20 @@ function escapeHTML(str) {
 
 function clampNota(valor) {
     if (valor === '' || valor === undefined || valor === null) return '';
-    let n = parseFloat(valor);
+    let n = parseFloat(String(valor).replace(',', '.'));
     if (isNaN(n)) return '';
     if (Number.isInteger(n) && n >= 10 && n <= 99) {
         n = n / 10;
     }
     n = Math.round(n * 10) / 10;
     return Math.min(7, Math.max(1, n));
+}
+
+// Convierte un valor (string/número) a número respetando el separador decimal
+// con coma (común en Chile): "5,5" -> 5.5. Devuelve NaN si no es numérico.
+function parsearNumero(valor) {
+    if (valor === '' || valor === undefined || valor === null) return NaN;
+    return parseFloat(String(valor).replace(',', '.'));
 }
 
 // Arma un cuadro de resultado "predictivo" colapsable: por defecto muestra solo
@@ -916,7 +946,7 @@ window.actualizarNotaLive = (ramoId, tipo, index, el) => {
     const r = ramos.find(x => x.id === ramoId);
     if (!r) return;
     const valor = el ? el.value : '';
-    const n = valor === '' ? '' : parseFloat(valor);
+    const n = valor === '' ? '' : parsearNumero(valor);
     const nVal = (n === '' || isNaN(n)) ? '' : n;
     if (tipo === 'cat') r.notasCat[index] = nVal;
     if (tipo === 'ej') r.notasEj[index] = nVal;
@@ -927,14 +957,14 @@ window.actualizarPesoInd = (ramoId, tipo, index, el) => {
     const r = ramos.find(x => x.id === ramoId);
     if (!r) return;
     const valor = el ? el.value : '';
-    if (tipo === 'cat') r.pesosCatInd[index] = valor !== '' ? parseFloat(valor) : '';
+    if (tipo === 'cat') r.pesosCatInd[index] = valor !== '' ? parsearNumero(valor) : '';
     guardarEnStorage();
 };
 window.actualizarPesoEjercicios = (ramoId, el) => {
     const r = ramos.find(x => x.id === ramoId);
     if (!r) return;
     const valor = el ? el.value : '';
-    r.pesoEjerciciosPct = Math.min(100, Math.max(0, parseFloat(valor) || 0));
+    r.pesoEjerciciosPct = Math.min(100, Math.max(0, parsearNumero(valor) || 0));
     guardarEnStorage(); window.actualizarVistaPesosCat(ramoId);
 };
 window.actualizarVistaPesosCat = (ramoId) => {
@@ -943,11 +973,11 @@ window.actualizarVistaPesosCat = (ramoId) => {
     let suma = 0;
     for (let i = 0; i < r.cantCat; i++) {
         const el = document.getElementById(`pcat-${ramoId}-${i}`);
-        suma += el ? (parseFloat(el.value) || 0) : 0;
+        suma += el ? (parsearNumero(el.value) || 0) : 0;
     }
     if (r.tieneEjercicios) {
         const elEj = document.getElementById(`pesoEj-${ramoId}`);
-        suma += elEj ? (parseFloat(elEj.value) || 0) : 0;
+        suma += elEj ? (parsearNumero(elEj.value) || 0) : 0;
     }
     const resumen = document.getElementById(`resumen-cat-${ramoId}`);
     if (!resumen) return;
@@ -961,15 +991,35 @@ window.actualizarVistaPesosCat = (ramoId) => {
     if (texto) { texto.textContent = mensaje; texto.style.color = color; }
 };
 
+// Guarda notas/pesos excedentes al reducir la cantidad de un ramo, para no
+// perderlos si el usuario vuelve a subir la cantidad. Se limpia al cambiar tipo.
+const _respaldoCantidad = {};
+function redimensionarPreservando(arr, nuevaCant) {
+    const previo = arr || [];
+    const result = Array(nuevaCant).fill('').map((_, i) => (previo[i] !== undefined) ? previo[i] : '');
+    const excedente = previo.slice(nuevaCant);
+    if (excedente.length) return { result, excedente };
+    return { result, excedente: [] };
+}
+
 window.actualizarCantidad = (ramoId, categoria, el) => {
     const r = ramos.find(x => x.id === ramoId);
     if (!r) return;
     const nuevaCant = Math.max(0, parseInt(el ? el.value : '') || 0);
-    const redimensionar = (arr) => Array(nuevaCant).fill('').map((_, i) => (arr && arr[i] !== undefined) ? arr[i] : '');
     const esPromedioSimple = (r.tipoRamo === 'sello' || r.tipoRamo === 'formacion_basica' || r.tipoRamo === 'transversal');
+    const cache = _respaldoCantidad[ramoId] || (_respaldoCantidad[ramoId] = {});
+    // Combina las notas actuales con las excedentes guardadas (del mismo ramo y
+    // categoría) y re-guarda el nuevo excedente. Al bajar la cantidad, las notas
+    // que quedan fuera se conservan en el cache; al subirla, se recuperan.
+    const redimensionar = (actuales) => {
+        const previos = cache[categoria] || [];
+        const pool = (actuales || []).concat(previos);
+        cache[categoria] = pool.slice(nuevaCant);
+        return pool.slice(0, nuevaCant);
+    };
     if (categoria === 'cat') {
         r.notasCat = redimensionar(r.notasCat);
-        r.pesosCatInd = esPromedioSimple ? pesosIguales(nuevaCant) : redimensionar(r.pesosCatInd);
+        r.pesosCatInd = esPromedioSimple ? pesosIguales(nuevaCant) : redimensionarPreservando(r.pesosCatInd, nuevaCant).result;
         r.cantCat = nuevaCant;
     }
     else if (categoria === 'ej') { r.notasEj = redimensionar(r.notasEj); r.cantEj = nuevaCant; }
@@ -984,6 +1034,7 @@ window.cambiarTipoRamo = (id, el) => {
     const base = crearRamoNuevoTipo(r.nombre, tipo);
     base.id = r.id;
     ramos = ramos.map(x => x.id === id ? base : x);
+    delete _respaldoCantidad[id];
     guardarEnStorage(); renderRamos();
 };
 
@@ -1014,7 +1065,7 @@ window.actualizarPromedioEjManualLive = (id, el) => {
     const r = ramos.find(x => x.id === id);
     if (!r) return;
     const valor = el ? el.value : '';
-    const n = valor === '' ? '' : parseFloat(valor);
+    const n = valor === '' ? '' : parsearNumero(valor);
     r.promedioEjManual = (n === '' || isNaN(n)) ? '' : n;
 };
 window.actualizarPromedioEjManual = (id, el) => {
@@ -1031,7 +1082,7 @@ window.actualizarConfigNuevo = (id, campo, el) => {
     const r = ramos.find(x => x.id === id);
     if (!r) return;
     const valor = el ? el.value : '';
-    const nuevoValor = valor === '' ? '' : (parseFloat(valor) || 0);
+    const nuevoValor = valor === '' ? '' : (parsearNumero(valor) || 0);
     const camposUmbral = ['notaReprobacionDirecta', 'notaAprobacion', 'notaEximicionMeta'];
     if (camposUmbral.includes(campo) && nuevoValor !== '') {
         const reprob = campo === 'notaReprobacionDirecta' ? nuevoValor : (r.notaReprobacionDirecta ?? 3.0);
@@ -1066,31 +1117,31 @@ window.actualizarNotaExamen = (id, el) => {
     if (el) el.value = n === '' ? '' : n.toFixed(1);
     guardarEnStorage();
 };
-window.actualizarNotaPARLive = (id, el) => { const r = ramos.find(x => x.id === id); if (!r) return; const valor = el ? el.value : ''; const n = valor === '' ? '' : parseFloat(valor); r.notaPAR = (n === '' || isNaN(n)) ? '' : n; };
-window.actualizarNotaRecuperativoLabLive = (id, el) => { const r = ramos.find(x => x.id === id); if (!r) return; const valor = el ? el.value : ''; const n = valor === '' ? '' : parseFloat(valor); r.notaRecuperativoLab = (n === '' || isNaN(n)) ? '' : n; };
-window.actualizarNotaExamenLive = (id, el) => { const r = ramos.find(x => x.id === id); if (!r) return; const valor = el ? el.value : ''; const n = valor === '' ? '' : parseFloat(valor); r.notaExamen = (n === '' || isNaN(n)) ? '' : n; };
+window.actualizarNotaPARLive = (id, el) => { const r = ramos.find(x => x.id === id); if (!r) return; const valor = el ? el.value : ''; const n = valor === '' ? '' : parsearNumero(valor); r.notaPAR = (n === '' || isNaN(n)) ? '' : n; };
+window.actualizarNotaRecuperativoLabLive = (id, el) => { const r = ramos.find(x => x.id === id); if (!r) return; const valor = el ? el.value : ''; const n = valor === '' ? '' : parsearNumero(valor); r.notaRecuperativoLab = (n === '' || isNaN(n)) ? '' : n; };
+window.actualizarNotaExamenLive = (id, el) => { const r = ramos.find(x => x.id === id); if (!r) return; const valor = el ? el.value : ''; const n = valor === '' ? '' : parsearNumero(valor); r.notaExamen = (n === '' || isNaN(n)) ? '' : n; };
 
 window.sincronizarPesoCatLab = (ramoId, origen, el) => {
-    const v = Math.min(100, Math.max(0, parseFloat(el ? el.value : '') || 0));
+    const v = Math.min(100, Math.max(0, parsearNumero(el ? el.value : '') || 0));
     const otroId = origen === 'cat' ? `pesoLabPct-${ramoId}` : `pesoCatPct-${ramoId}`;
     const otro = document.getElementById(otroId);
     if (otro) otro.value = (100 - v).toFixed(0);
 };
 window.actualizarPesoCatLab = (id, origen, el) => {
     const r = ramos.find(x => x.id === id); if (!r) return;
-    const v = Math.min(100, Math.max(0, parseFloat(el ? el.value : '') || 0));
+    const v = Math.min(100, Math.max(0, parsearNumero(el ? el.value : '') || 0));
     if (origen === 'cat') { r.pesoCatPct = v; r.pesoLabPct = 100 - v; } else { r.pesoLabPct = v; r.pesoCatPct = 100 - v; }
     guardarEnStorage();
 };
 window.sincronizarPesoPresentacionExamen = (ramoId, origen, el) => {
-    const v = Math.min(100, Math.max(0, parseFloat(el ? el.value : '') || 0));
+    const v = Math.min(100, Math.max(0, parsearNumero(el ? el.value : '') || 0));
     const otroId = origen === 'presentacion' ? `pesoExamenFinalPct-${ramoId}` : `pesoPresentacionPct-${ramoId}`;
     const otro = document.getElementById(otroId);
     if (otro) otro.value = (100 - v).toFixed(0);
 };
 window.actualizarPesoPresentacionExamen = (id, origen, el) => {
     const r = ramos.find(x => x.id === id); if (!r) return;
-    const v = Math.min(100, Math.max(0, parseFloat(el ? el.value : '') || 0));
+    const v = Math.min(100, Math.max(0, parsearNumero(el ? el.value : '') || 0));
     if (origen === 'presentacion') { r.pesoPresentacionPct = v; r.pesoExamenFinalPct = 100 - v; } else { r.pesoExamenFinalPct = v; r.pesoPresentacionPct = 100 - v; }
     guardarEnStorage();
 };
@@ -1684,7 +1735,11 @@ document.addEventListener('input', (e) => {
     const r = ramos.find(x => x.id === ramoId);
     if (!r) return;
     clearTimeout(_debounceTimers[ramoId]);
-    _debounceTimers[ramoId] = setTimeout(() => window.calcularRamoNuevo(ramoId, true), 150);
+    _debounceTimers[ramoId] = setTimeout(() => {
+        // Persistir los valores "en vivo" aunque el usuario no salga del input (blur/change).
+        guardarEnStorage();
+        window.calcularRamoNuevo(ramoId, true);
+    }, 150);
 });
 
 window.renderRamos = () => {
