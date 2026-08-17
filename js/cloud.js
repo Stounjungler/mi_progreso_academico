@@ -181,7 +181,15 @@ function aplicarEstadoCompleto(data) {
     aplicandoDesdeNube = true;
 
     guardarJSONLocal(LS_RAMOS, data.ramos || []);
-    localStorage.setItem(LS_CARRERA, data.carreraActiva || 'sin_asignar');
+    const carreraRemota = data.carreraActiva || 'sin_asignar';
+    // Ignorar carreras que ya no existen en la app (p. ej. se eliminó Minas).
+    if (typeof window.carrerasExistentes === 'function' && window.carrerasExistentes().includes(carreraRemota)) {
+        localStorage.setItem(LS_CARRERA, carreraRemota);
+    } else if (carreraRemota !== 'sin_asignar') {
+        localStorage.setItem(LS_CARRERA, 'computacion');
+    } else {
+        localStorage.setItem(LS_CARRERA, carreraRemota);
+    }
 
     Object.keys(localStorage).forEach(key => {
         if (key.startsWith(LS_PREFIX_ESTADO) || key.startsWith(LS_PREFIX_PREREQ) || key.startsWith(LS_PREFIX_LINK)) {

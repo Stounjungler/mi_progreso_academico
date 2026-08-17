@@ -61,21 +61,6 @@ const CARRERAS = {
             [ramo('comp-11-1','Proyecto de Título II'), ramo('comp-11-2','Gestión y Planificación Estratégica'), ramo('comp-11-3','Proyecto de Informática'), ramo('comp-11-4','Práctica Profesional')]
         ]
     },
-    minas: {
-        nombre: 'Ingeniería Civil en Minas',
-        semestres: [
-            [ramo('minas-1-1','Introducción a las Matemáticas'), ramo('minas-1-2','Introducción a la Física'), ramo('minas-1-3','Introducción a la Ingeniería de Minas'), ramo('minas-1-4','Formación Básica para la Vida Académica I'), ramo('minas-1-5','Curso Sello Institucional I: Inglés I')],
-            [ramo('minas-2-1','Álgebra I'), ramo('minas-2-2','Cálculo I'), ramo('minas-2-3','Mecánica'), ramo('minas-2-4','Formación Básica para la Vida Académica II'), ramo('minas-2-5','Curso Sello Institucional II: Inglés II')],
-            [ramo('minas-3-1','Álgebra II'), ramo('minas-3-2','Cálculo II'), ramo('minas-3-3','Química General'), ramo('minas-3-4','Geología General'), ramo('minas-3-5','TIC para la Minería'), ramo('minas-3-6','Curso Sello Institucional III')],
-            [ramo('minas-4-1','Ecuaciones Diferenciales'), ramo('minas-4-2','Cálculo III'), ramo('minas-4-3','Electricidad y Magnetismo'), ramo('minas-4-4','Métodos de Producción Minera'), ramo('minas-4-5','Petrografía y Mineralogía'), ramo('minas-4-6','Curso Sello Institucional IV')],
-            [ramo('minas-5-1','Probabilidad y Estadística'), ramo('minas-5-2','Fundamentos de Economía'), ramo('minas-5-3','Investigación Operativa'), ramo('minas-5-4','Termodinámica'), ramo('minas-5-5','Métodos Numéricos'), ramo('minas-5-6','Topografía y Geomensura Minera')],
-            [ramo('minas-6-1','Geoestadística'), ramo('minas-6-2','Evaluación de Proyectos'), ramo('minas-6-3','Exploración y Geología Económica'), ramo('minas-6-4','Perforación y Tronadura'), ramo('minas-6-5','Taller Integrador I'), ramo('minas-6-6','Interdisciplinar')],
-            [ramo('minas-7-1','Evaluación Económica de Yacimientos'), ramo('minas-7-2','Mecánica de Fluidos'), ramo('minas-7-3','Fundamentos de Metalurgia'), ramo('minas-7-4','Carguío y Transporte'), ramo('minas-7-5','Mecánica de Rocas'), ramo('minas-7-6','Interdisciplinar A+S')],
-            [ramo('minas-8-1','Software de Productividad Minera'), ramo('minas-8-2','Ventilación y Servicios Mina'), ramo('minas-8-3','Procesamiento de Minerales'), ramo('minas-8-4','Legislación Minera'), ramo('minas-8-5','Seguridad y Medio Ambiente en Minería'), ramo('minas-8-6','Taller Integrador II'), ramo('minas-8-7','Práctica Operacional')],
-            [ramo('minas-9-1','Proyecto de Título I'), ramo('minas-9-2','Gestión de Empresas y Liderazgo en Minería'), ramo('minas-9-3','Diseño y Planificación Mina Subterránea'), ramo('minas-9-4','Diseño y Planificación Rajo Abierto'), ramo('minas-9-5','Excelencia Operacional')],
-            [ramo('minas-10-1','Proyecto de Título II'), ramo('minas-10-2','Gestión de la Tecnología en Minería'), ramo('minas-10-3','Responsabilidad Social Empresarial en Minería'), ramo('minas-10-4','Innovación y Emprendimiento en Minería'), ramo('minas-10-5','Práctica Profesional')]
-        ]
-    }
 };
 
 const LS_CARRERA = 'malla_unif_carrera_activa';
@@ -83,7 +68,27 @@ const LS_PREFIX_ESTADO = 'malla_unif_estado_';
 const LS_PREFIX_PREREQ = 'malla_unif_prereq_';
 const LS_PREFIX_LINK = 'malla_unif_link_'; // ramoMallaId -> id de la tarjeta real en "Mis Ramos"
 
+window.carrerasExistentes = () => Object.keys(CARRERAS);
+
 let carreraActiva = localStorage.getItem(LS_CARRERA) || 'sin_asignar';
+// Si la carrera guardada ya no existe (p. ej. se eliminó "Ingeniería Civil en
+// Minas"), caer a Computación e Informática en lugar de dejar la malla vacía.
+if (!CARRERAS[carreraActiva]) {
+    carreraActiva = 'computacion';
+    localStorage.setItem(LS_CARRERA, carreraActiva);
+}
+// Limpiar datos residuales (estado/prerrequisitos/vínculos) de carreras que ya
+// no existen, p. ej. "Ingeniería Civil en Minas" que fue removida de CARRERAS.
+const carrerasValidas = new Set(Object.keys(CARRERAS));
+['estado', 'prereq', 'link'].forEach(prefix => {
+    const clave = { estado: LS_PREFIX_ESTADO, prereq: LS_PREFIX_PREREQ, link: LS_PREFIX_LINK }[prefix];
+    Object.keys(localStorage).forEach(k => {
+        if (k.startsWith(clave)) {
+            const carreraId = k.slice(clave.length);
+            if (!carrerasValidas.has(carreraId)) localStorage.removeItem(k);
+        }
+    });
+});
 let modoPrereq = false;
 let prereqEditandoId = null;
 
