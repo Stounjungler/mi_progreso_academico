@@ -56,7 +56,6 @@
         <section id="panel-ramos" class="panel">
             <div class="toolbar">
                 <div class="toolbar-actions">
-                    <button id="btnAgregarRamo" class="btn" data-action="agregarRamoManual">➕ Agregar Ramo</button>
                     <button class="btn btn-ghost" data-action="descargarRespaldo" title="Descarga un archivo .json con todos tus ramos">⬇️ Descargar respaldo</button>
                     <button class="btn btn-ghost" data-action="activarInputRespaldo" title="Restaura tus ramos desde un archivo .json de respaldo">⬆️ Restaurar respaldo</button>
                     <input type="file" id="inputRespaldo" accept="application/json,.json" class="hidden" data-action-change="manejarArchivoRespaldo">
@@ -100,10 +99,9 @@
                         <a href="#paso2"><span class="num">2</span> Modificar Notas</a>
                         <a href="#paso3"><span class="num">3</span> Estados de Ramo</a>
                         <a href="#paso4"><span class="num">4</span> Impacto en PPA</a>
-                        <a href="#paso5"><span class="num">5</span> Mis Ramos Extras</a>
-                        <a href="#paso6"><span class="num">6</span> Promedio Estimado</a>
-                        <a href="#paso7"><span class="num">7</span> Guardar en Nube</a>
-                        <a href="#paso8"><span class="num">8</span> Malla Oficial</a>
+                        <a href="#paso5"><span class="num">5</span> Promedio Estimado</a>
+                        <a href="#paso6"><span class="num">6</span> Guardar en Nube</a>
+                        <a href="#paso7"><span class="num">7</span> Malla Oficial</a>
                     </div>
                 </nav>
 
@@ -188,20 +186,6 @@
                     <div class="tt-step-head">
                         <div class="tt-step-num">5</div>
                         <div class="tt-step-titles">
-                            <h3>Agregar Ramos Extras</h3>
-                            <span class="tag tab-ramos">Pestaña Mis Ramos</span>
-                        </div>
-                    </div>
-                    <div class="tt-body">
-                        <p>¿Tomas un ramo que no está en la malla principal (Electivo, OFG)? Cámbate a la pestaña <strong>Mis Ramos</strong>.</p>
-                        <p>Allí puedes hacer clic en <button class="mini-btn primary" tabindex="-1" style="pointer-events:none">➕ Agregar Ramo</button> e ingresar el nombre, nota, y créditos manualmente.</p>
-                    </div>
-                </section>
-
-                <section id="paso6" class="tt-step">
-                    <div class="tt-step-head">
-                        <div class="tt-step-num">6</div>
-                        <div class="tt-step-titles">
                             <h3>Promedio Global Estimado</h3>
                             <span class="tag tab-ramos">Pestaña Mis Ramos</span>
                         </div>
@@ -215,9 +199,9 @@
                     </div>
                 </section>
 
-                <section id="paso7" class="tt-step">
+                <section id="paso6" class="tt-step">
                     <div class="tt-step-head">
-                        <div class="tt-step-num">7</div>
+                        <div class="tt-step-num">6</div>
                         <div class="tt-step-titles">
                             <h3>Guardar en la Nube</h3>
                             <span class="tag tab-cuenta">Cuenta</span>
@@ -236,9 +220,9 @@
                     </div>
                 </section>
 
-                <section id="paso8" class="tt-step">
+                <section id="paso7" class="tt-step">
                     <div class="tt-step-head">
-                        <div class="tt-step-num">8</div>
+                        <div class="tt-step-num">7</div>
                         <div class="tt-step-titles">
                             <h3>Ver la Malla Oficial</h3>
                             <span class="tag tab-malla">Pestaña Malla</span>

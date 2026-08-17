@@ -885,20 +885,6 @@ window.actualizarNombre = (id, el) => {
     guardarEnStorage();
 };
 
-// Botón "➕ Agregar Ramo" de la pestaña Mis Ramos: crea un ramo manual (tipo carrera).
-window.agregarRamoManual = () => {
-    const nuevo = crearRamoNuevoTipo('Nuevo Ramo', 'carrera');
-    ramos.push(nuevo);
-    guardarEnStorage(true);
-    renderRamos();
-    const el = document.getElementById('card-' + nuevo.id);
-    if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const nombreInput = el.querySelector('.ramo-nombre-input');
-        if (nombreInput) { nombreInput.focus(); nombreInput.select(); }
-    }
-};
-
 // Escapa caracteres especiales de HTML antes de insertar texto ingresado por el
 // usuario (ej: nombre de un ramo) dentro de innerHTML o atributos como value="...".
 function escapeHTML(str) {

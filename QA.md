@@ -30,7 +30,7 @@ Flujos críticos a probar antes de considerar el despliegue "listo". Marca cada 
 - [ ] Marcar un ramo de la malla como "cursando" crea su tarjeta en Mis Ramos.
 - [ ] Marcar como "aprobado" mueve el ramo correctamente (deja de estar en cursando).
 - [ ] Desmarcar/eliminar un ramo vuelve a dejarlo como pendiente en la malla (con confirmación).
-- [ ] "➕ Agregar Ramo" crea una tarjeta vacía y permite renombrarla.
+- [ ] Los ramos se agregan desde la Malla Curricular (marcar como "cursando") y se eliminan con su tarjeta.
 - [ ] Editar nombre, notas (cátedra/lab), pesos y cantidades recalcula el resultado en vivo.
 - [ ] Botón "Calcular" muestra resultado (aprobado/reprobado/crítico) y proyección.
 - [ ] Modo predictivo: se expande/colapsa y calcula la nota predicha.
