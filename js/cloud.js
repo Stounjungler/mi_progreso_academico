@@ -67,6 +67,13 @@ function inicializarGoogleIdentity() {
         }
     }
 
+    function ocultarFallback() {
+        if (fallback) {
+            fallback.classList.add('hidden');
+            fallback.style.display = 'none';
+        }
+    }
+
     if (!window.google || !window.google.accounts || !window.google.accounts.id || !GIS_CLIENT_ID) {
         mostrarFallback();
         return;
@@ -83,6 +90,7 @@ function inicializarGoogleIdentity() {
                 type: 'standard', theme: 'filled_blue', size: 'large',
                 text: 'continue_with', shape: 'rectangular', width: 300
             });
+            ocultarFallback();
         }
     } catch (e) {
         console.error('Google Identity error:', e);
