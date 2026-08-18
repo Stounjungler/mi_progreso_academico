@@ -543,8 +543,7 @@ onAuthStateChanged(auth, async (user) => {
 
     if (esPrimeraVezEstaCuenta) {
         setTimeout(() => {
-            const modal = document.getElementById('tutorialModal');
-            if (modal) modal.style.display = 'flex';
+            if (typeof window.openModal === 'function') window.openModal('tutorialModal');
         }, 400);
     }
 

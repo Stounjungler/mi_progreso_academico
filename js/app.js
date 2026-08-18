@@ -401,6 +401,10 @@ function openModal(modalId) {
     const content = modal.querySelector('.modal-content') || modal.firstElementChild;
     if (!content) return;
     modal.style.display = 'flex';
+    clearTimeout(modal._closeTimer); // cancelar un cierre pendiente si se reabre al instante
+    modal.classList.remove('modal-cerrando');
+    void modal.offsetWidth; // forzar reflow para que corra la transición de entrada
+    modal.classList.add('modal-abierto');
     modal.setAttribute('aria-hidden', 'false');
     content.setAttribute('tabindex', '-1');
 
@@ -434,8 +438,12 @@ function openModal(modalId) {
 function closeModal(modalId) {
     const modal = document.getElementById(modalId);
     if (!modal) return;
-    modal.style.display = 'none';
+    modal.classList.remove('modal-abierto');
+    modal.classList.add('modal-cerrando');
     modal.setAttribute('aria-hidden', 'true');
+    clearTimeout(modal._closeTimer);
+    // Dejar que corra la animación de salida antes de ocultar el overlay.
+    modal._closeTimer = setTimeout(() => { modal.style.display = 'none'; }, 200);
 
     // restore background interactivity
     Array.from(document.body.children).forEach(el => { if (el === modal) return; el.removeAttribute('inert'); });
