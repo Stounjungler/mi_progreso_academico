@@ -615,7 +615,7 @@ function _renderMallaInterno() {
             <div class="progreso-barra"><div class="progreso-barra-fill" data-pct="${pct}"></div></div>
             <div class="progreso-stats">
                 <span><span class="dot dot-success"></span><b>${aprobados}</b> aprobados</span>
-                <span><span class="dot dot-accent"></span><b>${cursando}</b> cursando</span>
+                <span><span class="dot dot-cursando"></span><b>${cursando}</b> cursando</span>
                 <span><span class="dot dot-faint"></span><b>${pendientes}</b> pendientes</span>
                 <span>de <b>${totalRamos}</b> ramos totales</span>
             </div>
