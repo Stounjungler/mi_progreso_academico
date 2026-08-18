@@ -724,7 +724,21 @@ function resumirCard(ramoObj) {
    ====================================================================== */
 const LS_RAMOS = 'malla_unif_ramos';
 let ramos = cargarJSON(LS_RAMOS, []);
-ramos.forEach(r => { if (r.tieneExamen === undefined) r.tieneExamen = true; if (r.promedioEjManual === undefined) r.promedioEjManual = ''; });
+
+// Recompone campos faltantes en ramos guardados por versiones anteriores o por
+// respaldos restaurados, para que el render de tarjetas y el motor de cálculo
+// nunca truenen por datos incompletos (p. ej. arreglos de notas ausentes).
+function normalizarRamo(r) {
+    if (!r || typeof r !== 'object') return null;
+    if (r.tieneExamen === undefined) r.tieneExamen = true;
+    if (r.promedioEjManual === undefined) r.promedioEjManual = '';
+    if (!Array.isArray(r.notasCat)) r.notasCat = [];
+    if (!Array.isArray(r.pesosCatInd)) r.pesosCatInd = [];
+    if (!Array.isArray(r.notasEj)) r.notasEj = [];
+    if (!Array.isArray(r.notasLab)) r.notasLab = [];
+    return r;
+}
+ramos = ramos.map(normalizarRamo).filter(Boolean);
 
 // Renderizar la malla por primera vez (ahora `ramos` ya está inicializado).
 // NOTA: `renderRamos()` no se llama aquí porque aún no están definidas funciones
@@ -785,8 +799,7 @@ window.cerrarConfirmarRestaurarModal = (event) => {
 
 window.confirmarRestaurarRespaldo = () => {
     if (!_respaldoPendiente) return;
-    ramos = _respaldoPendiente;
-    ramos.forEach(r => { if (r.tieneExamen === undefined) r.tieneExamen = true; if (r.promedioEjManual === undefined) r.promedioEjManual = ''; });
+    ramos = _respaldoPendiente.map(normalizarRamo).filter(Boolean);
     _respaldoPendiente = null;
     guardarEnStorage(true);
     renderRamos();
@@ -1158,12 +1171,26 @@ function renderPesosCatedra(r) {
 }
 
 /* ---- Motor de cálculo (idéntico a calcularRamoNuevo del dashboard) ---- */
+// Considera "vacía" una nota no ingresada: string vacío, null, undefined, no
+// numérica o NaN. Ojo: isNaN(null) es false (null se convierte a 0), así que
+// null/undefined se chequean explícitamente antes de delegar en isNaN, porque
+// parseFloat(null) devolvería NaN y envenenaría todo el cálculo.
+const notaVacia = (n) => n === '' || n === undefined || n === null || isNaN(n);
+const notaValida = (n) => !notaVacia(n) && isFinite(parseFloat(n));
+
 window.calcularRamoNuevo = (id, silencioso) => {
     const r = ramos.find(x => x.id === id);
     if (!r) return;
     const resBox = document.getElementById(`res-${id}`);
     if (!resBox) return;
     resBox.classList.remove('res-aprobado', 'res-reprobado', 'res-critico', 'res-proyeccion');
+
+    // Trabaja sobre copias defensivas: un dato corrupto (arreglo ausente) no
+    // debe tumbar el cálculo.
+    const notasCatRaw = Array.isArray(r.notasCat) ? r.notasCat : [];
+    const notasLabRaw = Array.isArray(r.notasLab) ? r.notasLab : [];
+    const notasEjRaw = Array.isArray(r.notasEj) ? r.notasEj : [];
+    const pesosCatInd = Array.isArray(r.pesosCatInd) ? r.pesosCatInd : [];
 
     const avisar = (msg) => {
         if (silencioso) {
@@ -1173,12 +1200,12 @@ window.calcularRamoNuevo = (id, silencioso) => {
         } else { alert(msg); }
     };
 
-    let notasCat = [...r.notasCat];
-    if (r.usaPAR && r.notaPAR !== '' && !isNaN(r.notaPAR)) {
+    let notasCat = [...notasCatRaw];
+    if (r.usaPAR && notaValida(r.notaPAR)) {
         let idxMin = 0, hayBaseValida = false;
         const limite = Math.min(3, notasCat.length);
         for (let i = 0; i < limite; i++) {
-            if (notasCat[i] !== '' && !isNaN(notasCat[i])) {
+            if (notaValida(notasCat[i])) {
                 if (!hayBaseValida || parseFloat(notasCat[i]) < parseFloat(notasCat[idxMin])) idxMin = i;
                 hayBaseValida = true;
             }
@@ -1186,11 +1213,11 @@ window.calcularRamoNuevo = (id, silencioso) => {
         if (hayBaseValida) notasCat[idxMin] = parseFloat(r.notaPAR);
     }
 
-    let notasLab = r.tieneLab ? [...r.notasLab] : [];
-    if (r.tieneLab && r.usaRecuperativoLab && r.notaRecuperativoLab !== '' && !isNaN(r.notaRecuperativoLab)) {
+    let notasLab = r.tieneLab ? [...notasLabRaw] : [];
+    if (r.tieneLab && r.usaRecuperativoLab && notaValida(r.notaRecuperativoLab)) {
         let idxMin = 0, hayBaseValida = false;
         for (let i = 0; i < notasLab.length; i++) {
-            if (notasLab[i] !== '' && !isNaN(notasLab[i])) {
+            if (notaValida(notasLab[i])) {
                 if (!hayBaseValida || parseFloat(notasLab[i]) < parseFloat(notasLab[idxMin])) idxMin = i;
                 hayBaseValida = true;
             }
@@ -1202,14 +1229,14 @@ window.calcularRamoNuevo = (id, silencioso) => {
     let conocido = 0, pesoVacio = 0, hayVacios = false;
 
     for (let i = 0; i < r.cantCat; i++) {
-        const peso = ((r.pesosCatInd[i] || 0) / 100) * escalaCat;
+        const peso = ((pesosCatInd[i] || 0) / 100) * escalaCat;
         const n = notasCat[i];
-        if (n === '' || n === undefined || isNaN(n)) { pesoVacio += peso; hayVacios = true; }
+        if (notaVacia(n)) { if (peso > 0) { pesoVacio += peso; hayVacios = true; } }
         else conocido += parseFloat(n) * peso;
     }
 
     if (r.tieneEjercicios) {
-        if (r.promedioEjManual !== '' && r.promedioEjManual !== undefined && !isNaN(r.promedioEjManual)) {
+        if (notaValida(r.promedioEjManual)) {
             const pesoEj = (r.pesoEjerciciosPct / 100) * escalaCat;
             conocido += parseFloat(r.promedioEjManual) * pesoEj;
         } else if (r.cantEj <= 0) {
@@ -1217,14 +1244,13 @@ window.calcularRamoNuevo = (id, silencioso) => {
             return;
         } else {
             const pesoEj = (r.pesoEjerciciosPct / 100) * escalaCat;
-            const notasEjValidas = r.notasEj.filter(n => n !== '' && !isNaN(n));
-            if (notasEjValidas.length === 0) { pesoVacio += pesoEj; hayVacios = true; }
-            else if (notasEjValidas.length < r.notasEj.length) {
-                const proporcionCompleta = notasEjValidas.length / r.notasEj.length;
+            const notasEjValidas = notasEjRaw.filter(n => notaValida(n));
+            if (pesoEj > 0 && notasEjValidas.length === 0) { pesoVacio += pesoEj; hayVacios = true; }
+            else if (notasEjValidas.length < notasEjRaw.length) {
+                const proporcionCompleta = notasEjValidas.length / notasEjRaw.length;
                 const promedioParcial = notasEjValidas.reduce((a, b) => a + parseFloat(b), 0) / notasEjValidas.length;
                 conocido += promedioParcial * pesoEj * proporcionCompleta;
-                pesoVacio += pesoEj * (1 - proporcionCompleta);
-                hayVacios = true;
+                if (pesoEj > 0) { pesoVacio += pesoEj * (1 - proporcionCompleta); hayVacios = true; }
             } else {
                 const promedioEj = notasEjValidas.reduce((a, b) => a + parseFloat(b), 0) / notasEjValidas.length;
                 conocido += promedioEj * pesoEj;
@@ -1234,15 +1260,14 @@ window.calcularRamoNuevo = (id, silencioso) => {
 
     if (r.tieneLab) {
         const pesoLabTotal = r.pesoLabPct / 100;
-        const notasLabValidas = notasLab.filter(n => n !== '' && !isNaN(n));
+        const notasLabValidas = notasLab.filter(n => notaValida(n));
         if (r.cantLab > 0) {
-            if (notasLabValidas.length === 0) { pesoVacio += pesoLabTotal; hayVacios = true; }
+            if (pesoLabTotal > 0 && notasLabValidas.length === 0) { pesoVacio += pesoLabTotal; hayVacios = true; }
             else if (notasLabValidas.length < notasLab.length) {
                 const proporcionCompleta = notasLabValidas.length / notasLab.length;
                 const promedioParcial = notasLabValidas.reduce((a, b) => a + parseFloat(b), 0) / notasLabValidas.length;
                 conocido += promedioParcial * pesoLabTotal * proporcionCompleta;
-                pesoVacio += pesoLabTotal * (1 - proporcionCompleta);
-                hayVacios = true;
+                if (pesoLabTotal > 0) { pesoVacio += pesoLabTotal * (1 - proporcionCompleta); hayVacios = true; }
             } else {
                 const promedioLab = notasLabValidas.reduce((a, b) => a + parseFloat(b), 0) / notasLabValidas.length;
                 conocido += promedioLab * pesoLabTotal;
@@ -1332,9 +1357,23 @@ window.calcularRamoNuevo = (id, silencioso) => {
     }
 
     const presentacion = conocido;
-    const promedioCat = notasCat.reduce((a, b, i) => a + parseFloat(b) * ((r.pesosCatInd[i] || 0) / 100), 0);
-    const notaEjerciciosCalculada = r.tieneEjercicios && r.cantEj > 0 ? r.notasEj.reduce((a, b) => a + parseFloat(b), 0) / r.cantEj : null;
-    const notaLabCalculada = r.tieneLab && r.cantLab > 0 ? notasLab.reduce((a, b) => a + parseFloat(b), 0) / r.cantLab : null;
+
+    // Detalles solo para nota: promedian SOLO las notas válidas dentro del rango
+    // configurado, ignorando vacíos/sobrantes, para no arrastrar NaN al detalle.
+    let promedioCat = 0;
+    for (let i = 0; i < r.cantCat && i < notasCat.length; i++) {
+        const v = notasCat[i];
+        if (notaValida(v)) promedioCat += parseFloat(v) * ((pesosCatInd[i] || 0) / 100);
+    }
+    const promedioEjManual = notaValida(r.promedioEjManual) ? parseFloat(r.promedioEjManual) : null;
+    const notaEjerciciosCalculada = r.tieneEjercicios && r.cantEj > 0
+        ? (promedioEjManual !== null
+            ? promedioEjManual
+            : (() => { const v = notasEjRaw.slice(0, r.cantEj).filter(n => notaValida(n)); return v.length ? v.reduce((a, b) => a + parseFloat(b), 0) / v.length : null; })())
+        : null;
+    const notaLabCalculada = r.tieneLab && r.cantLab > 0
+        ? (() => { const v = notasLab.slice(0, r.cantLab).filter(n => notaValida(n)); return v.length ? v.reduce((a, b) => a + parseFloat(b), 0) / v.length : null; })()
+        : null;
 
     let detalles = [`Cátedra: ${promedioCat.toFixed(2)}`];
     if (notaEjerciciosCalculada !== null) detalles.push(`Ejercicios: ${notaEjerciciosCalculada.toFixed(2)}`);
@@ -1781,8 +1820,7 @@ function renderRamos() {
    estado en memoria (ramos, carreraActiva) después de escribir datos nuevos en
    localStorage, sin duplicar la lógica de carga que ya existe acá. */
 window.recargarRamosDesdeStorage = () => {
-    ramos = cargarJSON(LS_RAMOS, []);
-    ramos.forEach(r => { if (r.tieneExamen === undefined) r.tieneExamen = true; if (r.promedioEjManual === undefined) r.promedioEjManual = ''; });
+    ramos = cargarJSON(LS_RAMOS, []).map(normalizarRamo).filter(Boolean);
     renderRamos();
 };
 
