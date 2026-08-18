@@ -34,6 +34,10 @@
 // Recuerda, por ramo, si el usuario expandió manualmente el cuadro de
 // "Modo Predictivo" (colapsado por defecto para no ser invasivo mientras escribe).
 let prediccionExpandida = {};
+// Última proyección del "Modo Predictivo" por ramo: guarda la nota con la que se
+// rellenarían las casillas vacías. La usa la exportación a PDF para poder generar
+// el reporte aunque falten notas (proyectado).
+let ultimaPrediccion = {};
 window.togglePrediccion = (id, event) => {
     if (event) event.stopPropagation();
     const resBox = document.getElementById(`res-${id}`);
@@ -1303,6 +1307,7 @@ window.calcularRamoNuevo = (id, silencioso) => {
                 resumen = notaParaAprobar.toFixed(1);
                 detalle = `<span>${notaParaAprobar.toFixed(1)}</span><div class="salvavidas">Necesitas promediar esta nota en lo que falta para <strong>aprobar</strong> (promedio ≥ ${meta.toFixed(1)}).</div>`;
             }
+            ultimaPrediccion[id] = { notaRelleno: notaARellenarVisual, metaAprobacion: meta, notaParaAprobar };
             resBox.innerHTML = envolverPrediccion(id, 'Modo Predictivo 🔮', resumen, detalle);
             resBox.style.display = 'block';
             return;
@@ -1351,6 +1356,7 @@ window.calcularRamoNuevo = (id, silencioso) => {
             resumen = '¡A Examen! 💀';
             detalle = `<span>¡A Examen! 💀</span><div class="salvavidas">Ya no te da para eximirte. Necesitas al menos <strong>${notaParaExamen.toFixed(1)}</strong> en lo que falta solo para tener <strong>derecho a examen</strong> (presentación ≥ ${metaExamen.toFixed(1)}).</div>`;
         }
+        ultimaPrediccion[id] = { notaRelleno: notaARellenarVisual, metaEximir, metaExamen, notaParaEximir, notaParaExamen };
         resBox.innerHTML = envolverPrediccion(id, 'Modo Predictivo 🔮', resumen, detalle);
         resBox.style.display = 'block';
         return;
@@ -1544,9 +1550,41 @@ window.exportarRamoPDF = (id) => {
         return;
     }
 
+    let esProyeccion = false;
+    let notasOriginales = null;
+    let notaRellenoUsada = null;
     if (resBox.classList.contains('res-proyeccion') && !resBox.querySelector('.res-header')?.textContent.includes('Derecho a Examen')) {
-        alert('Aún faltan notas por ingresar para poder generar el reporte final de este ramo.');
-        return;
+        // "Modo Predictivo": faltan notas. En vez de bloquear la exportación, se
+        // rellenan las casillas vacías con la nota proyectada y se genera el
+        // reporte marcado como "proyectado". Las notas reales del usuario NO se
+        // modifican ni se guardan: se restauran al terminar.
+        const pred = ultimaPrediccion[id];
+        if (!pred || !(pred.notaRelleno > 0)) {
+            alert('No se pudo calcular una proyección para este ramo. Revisa la configuración (pesos y cantidades) e intenta de nuevo.');
+            return;
+        }
+        notaRellenoUsada = pred.notaRelleno;
+        notasOriginales = {
+            cat: r.notasCat ? [...r.notasCat] : null,
+            ej: r.notasEj ? [...r.notasEj] : null,
+            lab: r.notasLab ? [...r.notasLab] : null,
+        };
+        const rellenar = (arr) => (arr || []).map(n => notaVacia(n) ? pred.notaRelleno : parseFloat(n));
+        r.notasCat = rellenar(r.notasCat);
+        if (r.tieneEjercicios) r.notasEj = rellenar(r.notasEj);
+        if (r.tieneLab) r.notasLab = rellenar(r.notasLab);
+        window.calcularRamoNuevo(id, false);
+        // Si pese al relleno el resultado sigue siendo una proyección pendiente
+        // (p. ej. faltan pesos/cantidades), restaurar el estado y avisar.
+        if (resBox.classList.contains('res-proyeccion') && !resBox.querySelector('.res-header')?.textContent.includes('Derecho a Examen')) {
+            r.notasCat = notasOriginales.cat;
+            r.notasEj = notasOriginales.ej;
+            r.notasLab = notasOriginales.lab;
+            window.calcularRamoNuevo(id, true);
+            alert('No se pudo calcular una proyección para este ramo. Revisa la configuración (pesos y cantidades) e intenta de nuevo.');
+            return;
+        }
+        esProyeccion = true;
     }
 
     let escenario; // 'exam' | 'approved' | 'failed'
@@ -1570,8 +1608,20 @@ window.exportarRamoPDF = (id) => {
         return;
     }
 
-    const elNumero = resBox.querySelector('span');
-    notaMostrada = elNumero ? parseFloat(elNumero.textContent.trim().replace(',', '.')) : NaN;
+    // En el modo "Derecho a Examen" (nota de presentación < eximición, examen en
+    // blanco) el número vive en el resumen colapsable antes del chevron, no en el
+    // primer <span> (que es el título). En el resto de escenarios la nota es el
+    // <span> simple del resultado.
+    let textoNumero = '';
+    const resumenEl = resBox.querySelector('.prediccion-resumen');
+    if (resumenEl) {
+        const chevronEl = resumenEl.querySelector('.prediccion-chevron');
+        textoNumero = chevronEl ? resumenEl.textContent.replace(chevronEl.textContent, '') : resumenEl.textContent;
+    } else {
+        const spanEl = resBox.querySelector('span');
+        textoNumero = spanEl ? spanEl.textContent : '';
+    }
+    notaMostrada = parseFloat(String(textoNumero).trim().replace(',', '.'));
     if (isNaN(notaMostrada)) {
         alert('No se pudo leer la nota calculada para generar el reporte.');
         return;
@@ -1637,10 +1687,10 @@ window.exportarRamoPDF = (id) => {
   *, *::before, *::after { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     color: #1e293b; margin: 0; padding: 0; background-color: #f8fafc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .top-accent-bar { height: 4px; background: linear-gradient(90deg, #1e3a8a 0%, #059669 50%, #dc2626 100%); border-radius: 2px; margin-bottom: 14px; }
+  .top-accent-bar { height: 4px; background: linear-gradient(90deg, #359164 0%, #66bf8f 50%, #dc2626 100%); border-radius: 2px; margin-bottom: 14px; }
   .header-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
   .header-title-cell { vertical-align: middle; padding-left: 0; }
-  .main-title { font-size: 18pt; font-weight: 800; color: #1e3a8a; margin: 0 0 4px 0; letter-spacing: -0.5px; }
+  .main-title { font-size: 18pt; font-weight: 800; color: #227b51; margin: 0 0 4px 0; letter-spacing: -0.5px; }
   .meta-container { font-size: 8.5pt; color: #64748b; line-height: 1.3; }
   .meta-line { margin-bottom: 2px; }
   .meta-label { font-weight: 500; color: #64748b; }
@@ -1676,6 +1726,7 @@ window.exportarRamoPDF = (id) => {
   .badge-white { display: inline-block; background-color: rgba(255,255,255,0.2); color: #fff; font-weight: 700; font-size: 8.5pt; padding: 1px 6px; border-radius: 5px; }
   .badge-emerald { display: inline-block; background-color: #34d399; color: #022c22; font-weight: 800; font-size: 9pt; padding: 1px 8px; border-radius: 5px; }
   .badge-rose { display: inline-block; background-color: #f43f5e; color: #fff; font-weight: 800; font-size: 8.5pt; padding: 1px 7px; border-radius: 5px; }
+  .projection-note { background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 9px 12px; margin-top: 12px; font-size: 8pt; color: #92400e; line-height: 1.45; }
   .footer { text-align: center; font-size: 7.5pt; font-variant: small-caps; letter-spacing: 0.8px; color: #a1a1aa; margin-top: 15px; padding-top: 8px; border-top: 1px solid #f1f5f9; }
 </style>
 </head>
@@ -1733,9 +1784,21 @@ window.exportarRamoPDF = (id) => {
     </div>
   </div>
 
+  ${esProyeccion ? `<div class="projection-note"><strong>Reporte proyectado (Modo Predictivo)</strong> — faltaban notas por ingresar y se completaron con la nota predicha <strong>${notaRellenoUsada.toFixed(1)}</strong> en las casillas vacías. Esta es una proyección: ingresa tus notas reales para obtener el reporte definitivo.</div>` : ''}
+
   <div class="footer">Mi Progreso Académico &bull; Documento generado automáticamente solo para lectura e impresión</div>
 </body>
 </html>`;
+
+    // Si se rellenaron notas solo para la proyección, restaurarlas de inmediato
+    // (el usuario no pierde ni guarda datos): primero se devuelve el estado en
+    // memoria y luego se vuelve a renderizar el "Modo Predictivo" en pantalla.
+    if (esProyeccion && notasOriginales) {
+        r.notasCat = notasOriginales.cat;
+        r.notasEj = notasOriginales.ej;
+        r.notasLab = notasOriginales.lab;
+        window.calcularRamoNuevo(id, true);
+    }
 
     const ventana = window.open('', '_blank', 'width=850,height=1100');
     if (!ventana) {
