@@ -22,7 +22,7 @@
     </noscript>
 
     <header class="site-header">
-        <div class="header-brand">🎓 Mi Progreso Académico</div>
+        <div class="header-brand">🎓 Mi Progreso Académico <span class="app-version" id="appVersion"></span></div>
         <div class="header-actions">
             <div id="usuarioInfo" class="usuario-info hidden" aria-hidden="true">
                 <img id="usuarioFoto" class="usuario-foto" src="" alt="Foto de usuario">
@@ -34,7 +34,7 @@
 
             <button id="btnGestionarCuenta" class="btn btn-ghost" title="Cambiar de cuenta o entrar en modo invitado" data-action="uiGestionarCuenta">Cambiar cuenta</button>
             <button id="temaToggleBtn" class="btn-tema" title="Cambiar tema" data-action="toggleTema">☀️</button>
-            <button id="btnTutorial" class="btn btn-ghost" data-action="open-tutorial">📘 Tutorial</button>
+            <button id="btnTutorial" class="btn btn-ghost" data-action="open-tutorial">📘 Guía Rápida</button>
             <button id="btnAyuda" class="btn btn-ghost" data-action="open-help">❔ Ayuda</button>
         </div>
     </header>
@@ -255,6 +255,7 @@
         <div class="modal-content" role="dialog" aria-modal="true">
             <h2>Restaurar Respaldo 📂</h2>
             <p>El archivo seleccionado contiene <strong id="confirmarRestaurarCantidad"></strong> ramo(s). Esto <strong style="color:var(--danger-text);">reemplazará</strong> todos los ramos actuales de "Mis Ramos" por los del respaldo. Esta acción no se puede deshacer.</p>
+            <p class="restaurar-aviso hidden" id="restaurarOmitidos"></p>
             <div class="dialog-actions">
                 <button class="btn btn-ghost" data-action="cerrar-confirmar-restaurar">Cancelar</button>
                 <button class="btn" data-action="confirmar-restaurar-respaldo" style="background:var(--accent); color:white;">Restaurar</button>

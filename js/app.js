@@ -28,6 +28,9 @@
     };
 })();
 
+// Versión de la app: única fuente de verdad, se muestra en el header (v{APP_VERSION}).
+const APP_VERSION = '0.5.0';
+
 /* ======================================================================
    PARTE 1 — DATOS Y LÓGICA DE LA MALLA CURRICULAR
    ====================================================================== */
@@ -274,7 +277,7 @@ function marcarEstado(carreraId, ramoId, nuevoEstado) {
         if (!link[ramoId]) {
             const nombreRamo = (CARRERAS[carreraId].semestres.flat().find(r => r.id === ramoId) || {}).nombre || '';
             const nuevaTarjeta = crearRamoNuevoTipo(nombreRamo, 'carrera');
-            ramos.push(nuevaTarjeta);
+            ramos.push(normalizarRamo(nuevaTarjeta));
             link[ramoId] = nuevaTarjeta.id;
             setLink(carreraId, link);
             guardarEnStorage();
@@ -650,7 +653,7 @@ function _renderMallaInterno() {
             const tituloTip = bloqueado ? `Requiere aprobar: ${faltantes.join(', ')}` : r.nombre;
 
             html += `<div class="ramo-chip-slot"><button type="button" class="ramo-chip ${claseEstado} ${editando ? 'editando' : ''}"
-                        ${(bloqueado && !modoPrereq) ? 'disabled' : ''} title="${tituloTip}"
+                        ${(bloqueado && !modoPrereq) ? 'disabled' : ''} title="${escapeHTML(tituloTip)}"
                         data-action="handleChipClick:${encodeURIComponent(carreraActiva)},${encodeURIComponent(r.id)}">
                         <span class="chip-icono">${icono}</span><span class="chip-nombre">${r.nombre}</span>
                     </button></div>`;
@@ -739,14 +742,81 @@ let ramos = cargarJSON(LS_RAMOS, []);
 // Recompone campos faltantes en ramos guardados por versiones anteriores o por
 // respaldos restaurados, para que el render de tarjetas y el motor de cálculo
 // nunca truenen por datos incompletos (p. ej. arreglos de notas ausentes).
+// ---- Sanitización en el borde: TODO ramo pasa por normalizarRamo() ----
+// Cualquier ramo, venga de respaldo .json, de la carga inicial o de la entrada
+// manual, se valida/coacciona aquí ANTES de llegar al DOM. Así ningún id o valor
+// numérico trucado puede inyectar HTML/atributos (los atributos usan r.id y
+// value="..." crudos en renderCardNuevo).
+const _R_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+const _TIPOS_RAMO = new Set(['matematicas', 'fisica', 'carrera', 'sello', 'formacion_basica', 'transversal']);
+
+function coercePct(valor, fallback) {
+    if (valor === '' || valor === undefined || valor === null) return fallback;
+    const n = Number(String(valor).replace(',', '.'));
+    if (isNaN(n) || !isFinite(n)) return fallback;
+    return Math.max(0, Math.min(100, n));
+}
+
+function coerceInt(valor, fallback) {
+    if (valor === '' || valor === undefined || valor === null) return fallback;
+    const n = Number(String(valor).replace(',', '.'));
+    if (isNaN(n) || !isFinite(n)) return fallback;
+    return Math.max(0, Math.floor(n));
+}
+
+function coerceNota(valor, fallback) {
+    const c = clampNota(valor);
+    return c === '' ? fallback : c;
+}
+
 function normalizarRamo(r) {
     if (!r || typeof r !== 'object') return null;
-    if (r.tieneExamen === undefined) r.tieneExamen = true;
-    if (r.promedioEjManual === undefined) r.promedioEjManual = '';
-    if (!Array.isArray(r.notasCat)) r.notasCat = [];
-    if (!Array.isArray(r.pesosCatInd)) r.pesosCatInd = [];
-    if (!Array.isArray(r.notasEj)) r.notasEj = [];
-    if (!Array.isArray(r.notasLab)) r.notasLab = [];
+
+    // id: se interpola en id="", data-action, data-action-input/change, etc.
+    // Un id legítimo es solo alfanumérico + guiones/baja (Date.now()+random).
+    // Si trae comillas, espacios o símbolos es inyección: se RECHAZA el ramo.
+    if (typeof r.id !== 'string' || !_R_ID_PATTERN.test(r.id)) {
+        console.warn('Ramo con id inválido descartado:', r.id);
+        return null;
+    }
+
+    if (!_TIPOS_RAMO.has(r.tipoRamo)) r.tipoRamo = 'carrera';
+    if (typeof r.nombre !== 'string') r.nombre = '';
+
+    // Notas (1–7; queda '' si no es numérica, respetando la coma decimal).
+    r.notasCat = Array.isArray(r.notasCat) ? r.notasCat.map(clampNota) : [];
+    r.notasEj = Array.isArray(r.notasEj) ? r.notasEj.map(clampNota) : [];
+    r.notasLab = Array.isArray(r.notasLab) ? r.notasLab.map(clampNota) : [];
+    r.notaPAR = clampNota(r.notaPAR);
+    r.notaRecuperativoLab = clampNota(r.notaRecuperativoLab);
+    r.notaExamen = clampNota(r.notaExamen);
+    r.promedioEjManual = clampNota(r.promedioEjManual);
+
+    // Cantidades (enteros ≥ 0).
+    r.cantCat = coerceInt(r.cantCat, 3);
+    r.cantEj = coerceInt(r.cantEj, 0);
+    r.cantLab = coerceInt(r.cantLab, 0);
+
+    // Pesos (0–100).
+    r.pesosCatInd = Array.isArray(r.pesosCatInd) ? r.pesosCatInd.map(v => coercePct(v, 0)) : [];
+    r.pesoEjerciciosPct = coercePct(r.pesoEjerciciosPct, 15);
+    r.pesoCatPct = coercePct(r.pesoCatPct, 70);
+    r.pesoLabPct = coercePct(r.pesoLabPct, 30);
+    r.pesoPresentacionPct = coercePct(r.pesoPresentacionPct, 70);
+    r.pesoExamenFinalPct = coercePct(r.pesoExamenFinalPct, 30);
+
+    // Umbrales (1–7).
+    r.notaEximicionMeta = coerceNota(r.notaEximicionMeta, 5.0);
+    r.notaAprobacion = coerceNota(r.notaAprobacion, 4.0);
+    r.notaReprobacionDirecta = coerceNota(r.notaReprobacionDirecta, 3.0);
+
+    // Booleanos.
+    r.tieneLab = !!r.tieneLab;
+    r.tieneExamen = r.tieneExamen === undefined ? true : !!r.tieneExamen;
+    r.tieneEjercicios = !!r.tieneEjercicios;
+    r.usaPAR = !!r.usaPAR;
+    r.usaRecuperativoLab = !!r.usaRecuperativoLab;
+
     return r;
 }
 ramos = ramos.map(normalizarRamo).filter(Boolean);
@@ -827,8 +897,25 @@ window.manejarArchivoRespaldo = (el) => {
         if (!Array.isArray(datos)) { alert('El archivo no tiene el formato esperado: se esperaba un arreglo de ramos.'); return; }
         const estructuraValida = datos.every(r => r && typeof r === 'object' && typeof r.id !== 'undefined' && typeof r.nombre === 'string' && typeof r.tipoRamo === 'string');
         if (!estructuraValida) { alert('El archivo no tiene la estructura esperada de un respaldo de "Mis Ramos".'); return; }
-        _respaldoPendiente = datos;
-        document.getElementById('confirmarRestaurarCantidad').textContent = datos.length;
+        // Sanitizar en el borde ANTES de ofrecer restaurar: se descartan ramos con
+        // ids inválidos y se coaccionan todos los campos numéricos a valores seguros.
+        _respaldoPendiente = datos.map(normalizarRamo).filter(Boolean);
+        const omitidos = datos.length - _respaldoPendiente.length;
+        document.getElementById('confirmarRestaurarCantidad').textContent = _respaldoPendiente.length;
+        const avisoEl = document.getElementById('restaurarOmitidos');
+        if (avisoEl) {
+            if (omitidos > 0) {
+                avisoEl.textContent = `Se omitieron ${omitidos} ramo(s) con datos inválidos o un id no seguro.`;
+                avisoEl.classList.remove('hidden');
+            } else {
+                avisoEl.textContent = '';
+                avisoEl.classList.add('hidden');
+            }
+        }
+        if (_respaldoPendiente.length === 0) {
+            alert('El archivo no contiene ramos válidos para restaurar.');
+            return;
+        }
         openModal('confirmarRestaurarModal');
     };
     reader.onerror = () => alert('No se pudo leer el archivo seleccionado.');
@@ -1148,6 +1235,20 @@ window.actualizarConfigNuevo = (id, campo, el) => {
 
 window.togglePAR = (id) => { const r = ramos.find(x => x.id === id); if (!r) return; r.usaPAR = !r.usaPAR; guardarEnStorage(); renderRamos(); };
 window.toggleRecuperativoLab = (id) => { const r = ramos.find(x => x.id === id); if (!r) return; r.usaRecuperativoLab = !r.usaRecuperativoLab; guardarEnStorage(); renderRamos(); };
+
+// Despliega/repliega la "Configuración avanzada" de cada tarjeta. La preferencia
+// es global y persistente para que no se vuelva a cerrar en cada re-render.
+// (El dispatcher de clicks no pasa el elemento, así que se aplica a todas las tarjetas.)
+window.toggleAvanzado = () => {
+    const abierto = localStorage.getItem('mpa_ui_avanzado_abierto') !== '1';
+    localStorage.setItem('mpa_ui_avanzado_abierto', abierto ? '1' : '0');
+    document.querySelectorAll('.config-avanzado-wrap').forEach(w => w.classList.toggle('abierto', abierto));
+    document.querySelectorAll('.btn-config-avanzado').forEach(b => {
+        b.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+        const chev = b.querySelector('.chev');
+        if (chev) chev.textContent = abierto ? '▴' : '▾';
+    });
+};
 
 window.actualizarNotaPAR = (id, el) => {
     const r = ramos.find(x => x.id === id); if (!r) return;
@@ -1480,6 +1581,7 @@ function esRamoVinculado(ramoId) {
 
 function renderCardNuevo(r) {
     const labelsCat = ['N1', 'N2', 'N3'];
+    const avanzadoAbierto = localStorage.getItem('mpa_ui_avanzado_abierto') === '1';
     const inputsCatHTML = r.notasCat.map((nota, i) => `
         <div class="celda-nota"><input type="number" id="cat-${r.id}-${i}" step="0.1" min="1" max="7" value="${nota}" placeholder="${labelsCat[i] || ('N' + (i + 1))}" data-action-input="actualizarNotaLive:${r.id},cat,${i}" data-action-change="actualizarNota:${r.id},cat,${i}"></div>`).join('');
     const inputsLabHTML = r.tieneLab ? r.notasLab.map((nota, i) => `
@@ -1510,6 +1612,11 @@ function renderCardNuevo(r) {
                         <option value="transversal" ${r.tipoRamo === 'transversal' ? 'selected' : ''}>🔀 Transversal</option>
                     </select>
                 </div>
+                <button type="button" class="btn-config-avanzado" aria-expanded="${avanzadoAbierto}" data-action="toggleAvanzado:${r.id}">
+                    <span>⚙️ Configuración avanzada</span><span class="chev">${avanzadoAbierto ? '▴' : '▾'}</span>
+                </button>
+                <div class="config-avanzado-wrap ${avanzadoAbierto ? 'abierto' : ''}">
+                <div class="config-avanzado-inner">
                 ${(r.tipoRamo === 'fisica' || r.tipoRamo === 'carrera') ? `<label class="toggle-avanzado" style="width:100%; margin:0 0 15px 0;" title="Actívalo si este ramo tiene laboratorio con notas propias"><span>🧪 Este ramo tiene laboratorio</span><input type="checkbox" data-action-change="toggleLabRamo:${r.id}" ${r.tieneLab ? 'checked' : ''}></label>` : ''}
                 ${r.tipoRamo === 'sello' ? `<label class="toggle-avanzado" style="width:100%; margin:0 0 15px 0;" title="Desactívalo si este curso sello no tiene examen final (ej: Inglés I)"><span>📝 Este ramo tiene examen</span><input type="checkbox" data-action-change="toggleExamenRamo:${r.id}" ${r.tieneExamen ? 'checked' : ''}></label>` : ''}
                 ${(() => { const esPromedioSimple = (r.tipoRamo === 'sello' || r.tipoRamo === 'formacion_basica' || r.tipoRamo === 'transversal'); return esPromedioSimple ? '' : `
@@ -1536,6 +1643,8 @@ function renderCardNuevo(r) {
                 <div class="config-row">
                     <div class="input-group"><label title="Nota Aprobación">Aprobación</label><input type="number" step="0.1" min="1" max="7" value="${r.notaAprobacion ?? 4.0}" data-action-change="actualizarConfigNuevo:${r.id},notaAprobacion"></div>
                 </div>`}
+                </div>
+                </div>
             </div>
 
             <div class="notas-subtitulo">Notas de Cátedra</div>
@@ -1930,3 +2039,33 @@ window.recargarRamosDesdeStorage = () => {
 // Render inicial de la pestaña "Mis Ramos": aquí todas las funciones que usa ya
 // están definidas (hoisted o asignadas a window), a diferencia del boot.
 renderRamos();
+
+// Mostrar la versión en el header (deja vacío si el elemento no existe aún).
+const appVersionEl = document.getElementById('appVersion');
+if (appVersionEl) appVersionEl.textContent = 'v' + APP_VERSION;
+
+/* ---- Barra de pestañas sticky + selector de carrera alineado ----
+   La altura de .tabs puede cambiar (wrap en pantallas medianas), así que el
+   offset del .selector-card se calcula midiendo el elemento real y se expone
+   como variable CSS (--sticky-top) en vez de usar un valor fijo. */
+(function setupStickyTabs() {
+    const tabsEl = document.querySelector('.tabs');
+    const root = document.documentElement;
+    if (!tabsEl) return;
+
+    const syncStickyTop = () => {
+        const h = tabsEl.getBoundingClientRect().height || tabsEl.offsetHeight || 0;
+        root.style.setProperty('--sticky-top', h + 'px');
+    };
+    const syncStuck = () => tabsEl.classList.toggle('stuck', window.scrollY > 0);
+
+    syncStickyTop();
+    syncStuck();
+    if (typeof ResizeObserver !== 'undefined') {
+        const ro = new ResizeObserver(syncStickyTop);
+        ro.observe(tabsEl);
+    } else {
+        window.addEventListener('resize', syncStickyTop);
+    }
+    window.addEventListener('scroll', syncStuck, { passive: true });
+})();
