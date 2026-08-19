@@ -543,7 +543,9 @@ onAuthStateChanged(auth, async (user) => {
 
     if (esPrimeraVezEstaCuenta) {
         setTimeout(() => {
-            if (typeof window.openModal === 'function') window.openModal('tutorialModal');
+            // Si el usuario aún no vio el tutorial interactivo (primera visita),
+            // ese ya se abrió solo; no mostramos también la Guía Rápida.
+            if (localStorage.getItem('mpa_tutorial_demo_visto') === '1' && typeof window.openModal === 'function') window.openModal('tutorialModal');
         }, 400);
     }
 

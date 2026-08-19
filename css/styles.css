@@ -556,3 +556,47 @@ html.sesion-bloqueada, html.sesion-bloqueada body {
     .modal-overlay.modal-cerrando { transition: opacity 0.01ms, visibility 0s !important; }
 }
 
+
+/* ---- Tutorial interactivo (demo paso a paso) ---- */
+.modal-content-tutorial-demo { max-width: 540px; width: 100%; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+/* Sin flex-shrink: el contenido (tipo, cards, notas) conserva su alto natural y
+   si desborda la altura máxima el contenedor scrollea, en vez de encoger la caja
+   y dejar que el contenido se pinte debajo de los botones Atrás/Siguiente. */
+.modal-content-tutorial-demo > * { flex-shrink: 0; }
+.td-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.td-header h2 { margin: 0; font-size: 18px; }
+.td-cerrar { padding: 4px 10px; font-size: 14px; line-height: 1; }
+.td-progress { height: 6px; border-radius: 999px; background: var(--navy-border); overflow: hidden; }
+.td-progress-bar { height: 100%; width: 0%; background: var(--accent); border-radius: 999px; transition: width var(--dur-mid) var(--ease-out-expo); }
+.td-paso-num { font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.td-contenido { min-height: 220px; display: flex; flex-direction: column; gap: 12px; }
+.td-titulo-paso { font-size: 15px; font-weight: 800; margin: 0; }
+.td-texto { font-size: 14px; color: var(--text-muted); line-height: 1.5; margin: 0; }
+.td-tipos { display: flex; flex-direction: column; gap: 8px; }
+.tipo-ramo-opcion { display: flex; flex-direction: column; gap: 3px; width: 100%; text-align: left; padding: 12px 14px;
+    border: 1.5px solid var(--navy-border); border-radius: 12px; background: var(--card-bg); color: inherit; font: inherit;
+    cursor: pointer; transition: border-color var(--dur-fast) var(--ease-out-expo), background var(--dur-fast) var(--ease-out-expo); }
+.tipo-ramo-opcion:hover { border-color: var(--accent); }
+.tipo-ramo-opcion.sel { border-color: var(--accent); background: var(--accent-soft); }
+.tipo-ramo-opcion .tr-nombre { font-weight: 800; font-size: 14px; }
+.tipo-ramo-opcion .tr-desc { font-size: 12.5px; color: var(--text-muted); }
+.td-card { border: 1.5px solid var(--navy-border); border-radius: 14px; padding: 14px; background: var(--card-bg); box-shadow: var(--shadow-soft); }
+.td-card .ramo-nombre { font-weight: 800; font-size: 14px; margin-bottom: 10px; }
+.td-aviso { font-size: 12.5px; color: var(--text-muted); font-weight: 700; }
+.td-error { display: none; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px;
+    background: var(--danger-soft); border: 1px solid var(--danger); color: var(--danger-text);
+    font-size: 13px; font-weight: 800; line-height: 1.4; }
+.td-error.visible { display: flex; animation: tdShake var(--dur-mid) var(--ease-out-expo); }
+@keyframes tdShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-5px); }
+    40% { transform: translateX(5px); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateX(3px); }
+}
+.td-acciones { display: flex; justify-content: space-between; gap: 10px; }
+.td-acciones .btn { min-width: 96px; }
+@media (max-width: 640px) {
+    .modal-content-tutorial-demo { padding: 16px; }
+    .tipo-ramo-opcion { padding: 10px 12px; }
+}

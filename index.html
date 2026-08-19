@@ -34,6 +34,7 @@
 
             <button id="btnGestionarCuenta" class="btn btn-ghost" title="Cambiar de cuenta o entrar en modo invitado" data-action="uiGestionarCuenta">Cambiar cuenta</button>
             <button id="temaToggleBtn" class="btn-tema" title="Cambiar tema" data-action="toggleTema">☀️</button>
+            <button id="btnTutorialDemo" class="btn btn-ghost" data-action="open-tutorial-demo">🎓 Tutorial</button>
             <button id="btnTutorial" class="btn btn-ghost" data-action="open-tutorial">📘 Guía Rápida</button>
             <button id="btnAyuda" class="btn btn-ghost" data-action="open-help">❔ Ayuda</button>
         </div>
@@ -236,6 +237,23 @@
                 <div class="tt-closing">
                     ¡Eso es todo! Ya estás listo para planificar tu <strong>futuro académico</strong>. 🚀
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tutorialDemoModal" class="modal-overlay" aria-hidden="true" data-action="td-overlay-click" data-target="tutorialDemoModal">
+        <div class="modal-content modal-content-tutorial-demo" role="dialog" aria-modal="true" aria-labelledby="tutorialDemoTitulo" data-action="stop-prop">
+            <div class="td-header">
+                <h2 id="tutorialDemoTitulo">🎓 Tutorial Interactivo</h2>
+                <button type="button" class="btn td-cerrar" data-action="cerrar-tutorial-demo" title="Salir del tutorial (no se guarda nada)">✕</button>
+            </div>
+            <div class="td-progress" role="progressbar" aria-label="Progreso del tutorial"><div class="td-progress-bar" id="tdProgreso"></div></div>
+            <div class="td-paso-num">Paso <span id="tdPasoActual">1</span> de 6</div>
+            <div id="tdContenido" class="td-contenido"></div>
+            <div id="tdError" class="td-error" role="alert"></div>
+            <div class="td-acciones">
+                <button type="button" class="btn btn-ghost" id="tdBtnAtras" data-action="td-atras">← Atrás</button>
+                <button type="button" class="btn btn-primary" id="tdBtnSiguiente" data-action="td-siguiente">Comenzar →</button>
             </div>
         </div>
     </div>

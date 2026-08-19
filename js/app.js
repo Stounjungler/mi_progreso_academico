@@ -323,6 +323,13 @@ document.addEventListener('click', (e) => {
             }
             case 'descargarMallaOficial': e.preventDefault(); if (typeof window.descargarMallaOficial === 'function') window.descargarMallaOficial(); break;
             case 'open-tutorial': openModal('tutorialModal'); break;
+            case 'open-tutorial-demo': if (typeof window.openTutorialDemo === 'function') window.openTutorialDemo(); break;
+            case 'cerrar-tutorial-demo': if (typeof window.cerrarTutorialDemo === 'function') window.cerrarTutorialDemo(); break;
+            case 'td-siguiente': if (typeof window.tdSiguiente === 'function') window.tdSiguiente(); break;
+            case 'td-atras': if (typeof window.tdAtras === 'function') window.tdAtras(); break;
+            case 'td-tipo': if (typeof window.tdTipo === 'function') window.tdTipo(...params); break;
+            case 'td-toggle-avanzado': if (typeof window.tdToggleAvanzado === 'function') window.tdToggleAvanzado(); break;
+            case 'td-overlay-click': if (e.target && e.target.id === el.getAttribute('data-target')) { if (typeof window.cerrarTutorialDemo === 'function') window.cerrarTutorialDemo(); } break;
             case 'open-help': openModal('guiaModal'); break;
             case 'close-tutorial': closeModal('tutorialModal'); break;
             case 'close-help': closeModal('guiaModal'); break;
@@ -1142,7 +1149,10 @@ function redimensionarPreservando(arr, nuevaCant) {
 window.actualizarCantidad = (ramoId, categoria, el) => {
     const r = ramos.find(x => x.id === ramoId);
     if (!r) return;
-    const nuevaCant = Math.max(0, parseInt(el ? el.value : '') || 0);
+    // Ninguna cantidad puede quedar en 0: cada bloque (cátedras, talleres y
+    // laboratorio) necesita al menos 1 nota que ingresar. Con 0 el bloque
+    // no aportaría ninguna nota.
+    const nuevaCant = Math.max(1, parseInt(el ? el.value : '') || 0);
     const esPromedioSimple = (r.tipoRamo === 'sello' || r.tipoRamo === 'formacion_basica' || r.tipoRamo === 'transversal');
     const cache = _respaldoCantidad[ramoId] || (_respaldoCantidad[ramoId] = {});
     // Combina las notas actuales con las excedentes guardadas (del mismo ramo y
@@ -1236,18 +1246,33 @@ window.actualizarConfigNuevo = (id, campo, el) => {
 window.togglePAR = (id) => { const r = ramos.find(x => x.id === id); if (!r) return; r.usaPAR = !r.usaPAR; guardarEnStorage(); renderRamos(); };
 window.toggleRecuperativoLab = (id) => { const r = ramos.find(x => x.id === id); if (!r) return; r.usaRecuperativoLab = !r.usaRecuperativoLab; guardarEnStorage(); renderRamos(); };
 
-// Despliega/repliega la "Configuración avanzada" de cada tarjeta. La preferencia
-// es global y persistente para que no se vuelva a cerrar en cada re-render.
-// (El dispatcher de clicks no pasa el elemento, así que se aplica a todas las tarjetas.)
-window.toggleAvanzado = () => {
-    const abierto = localStorage.getItem('mpa_ui_avanzado_abierto') !== '1';
-    localStorage.setItem('mpa_ui_avanzado_abierto', abierto ? '1' : '0');
-    document.querySelectorAll('.config-avanzado-wrap').forEach(w => w.classList.toggle('abierto', abierto));
-    document.querySelectorAll('.btn-config-avanzado').forEach(b => {
-        b.setAttribute('aria-expanded', abierto ? 'true' : 'false');
-        const chev = b.querySelector('.chev');
-        if (chev) chev.textContent = abierto ? '▴' : '▾';
-    });
+const LS_AVANZADO_POR_RAMO = 'mpa_ui_avanzado_por_ramo';
+
+// Estado de la "Configuración avanzada" POR RAMO (mapa id -> abierto). Si el ramo
+// no está en el mapa, cae al flag global viejo como compatibilidad con versiones
+// anteriores. Así cada tarjeta se despliega independientemente de las demás.
+function avanzadoAbiertoDe(id) {
+    const m = cargarJSON(LS_AVANZADO_POR_RAMO, {});
+    if (id !== undefined && id !== null && id in m) return m[id] === true;
+    return localStorage.getItem('mpa_ui_avanzado_abierto') === '1';
+}
+
+// Despliega/repliega SOLO la "Configuración avanzada" de la tarjeta del ramo
+// clickeado. El dispatcher pasa el id en params (data-action="toggleAvanzado:<id>").
+window.toggleAvanzado = (ramoId) => {
+    if (!ramoId) return;
+    const m = cargarJSON(LS_AVANZADO_POR_RAMO, {});
+    m[ramoId] = !(m[ramoId] === true);
+    localStorage.setItem(LS_AVANZADO_POR_RAMO, JSON.stringify(m));
+    const abierto = m[ramoId];
+    const btn = document.querySelector(`.btn-config-avanzado[data-action="toggleAvanzado:${ramoId}"]`);
+    if (!btn) return;
+    const card = btn.closest('.config-box');
+    const wrap = card ? card.querySelector('.config-avanzado-wrap') : null;
+    if (wrap) wrap.classList.toggle('abierto', abierto);
+    btn.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+    const chev = btn.querySelector('.chev');
+    if (chev) chev.textContent = abierto ? '▴' : '▾';
 };
 
 window.actualizarNotaPAR = (id, el) => {
@@ -1581,7 +1606,7 @@ function esRamoVinculado(ramoId) {
 
 function renderCardNuevo(r) {
     const labelsCat = ['N1', 'N2', 'N3'];
-    const avanzadoAbierto = localStorage.getItem('mpa_ui_avanzado_abierto') === '1';
+    const avanzadoAbierto = avanzadoAbiertoDe(r.id);
     const inputsCatHTML = r.notasCat.map((nota, i) => `
         <div class="celda-nota"><input type="number" id="cat-${r.id}-${i}" step="0.1" min="1" max="7" value="${nota}" placeholder="${labelsCat[i] || ('N' + (i + 1))}" data-action-input="actualizarNotaLive:${r.id},cat,${i}" data-action-change="actualizarNota:${r.id},cat,${i}"></div>`).join('');
     const inputsLabHTML = r.tieneLab ? r.notasLab.map((nota, i) => `
@@ -1649,7 +1674,7 @@ function renderCardNuevo(r) {
 
             <div class="notas-subtitulo">Notas de Cátedra</div>
             <div style="display:flex; gap:12px; align-items:stretch; margin-bottom:12px;">
-                <div class="input-group" style="flex:2; min-width:0; margin:0;"><label>Cantidad de Cátedras</label><input type="number" min="0" value="${r.cantCat}" data-action-change="actualizarCantidad:${r.id},cat"></div>
+                <div class="input-group" style="flex:2; min-width:0; margin:0;"><label>Cantidad de Cátedras</label><input type="number" min="1" value="${r.cantCat}" data-action-change="actualizarCantidad:${r.id},cat"></div>
                 <label class="toggle-avanzado" style="flex:1.3; min-width:120px; margin:24px 0 0 0;" title="Reemplaza tu nota más baja entre N1-N3"><span>Prueba PAR</span><input type="checkbox" data-action-change="togglePAR:${r.id}" ${r.usaPAR ? 'checked' : ''}></label>
             </div>
             <div class="notas-grid">${inputsCatHTML}</div>
@@ -1658,7 +1683,7 @@ function renderCardNuevo(r) {
             ${r.tieneEjercicios ? `
             <div class="notas-subtitulo">Otras Actividades (Talleres-Controles)</div>
             <div class="config-row" style="margin-bottom:12px;">
-                <div class="input-group"><label>Cantidad de Ejercicios</label><input type="number" min="0" value="${r.cantEj}" data-action-change="actualizarCantidad:${r.id},ej"></div>
+                <div class="input-group"><label>Cantidad de Ejercicios</label><input type="number" min="1" value="${r.cantEj}" data-action-change="actualizarCantidad:${r.id},ej"></div>
                 <div class="input-group"><label title="Si ya sabes el promedio pero no las notas individuales, ponlo aquí">Promedio (opcional)</label><input type="number" step="0.1" min="1" max="7" value="${r.promedioEjManual}" placeholder="Ej: 6,4" data-action-input="actualizarPromedioEjManualLive:${r.id}" data-action-change="actualizarPromedioEjManual:${r.id}"></div>
             </div>
             <div class="notas-grid">${inputsEjHTML}</div>` : ''}
@@ -1666,7 +1691,7 @@ function renderCardNuevo(r) {
             ${r.tieneLab ? `
             <div class="notas-subtitulo">Notas de Laboratorio</div>
             <div style="display:flex; gap:12px; align-items:stretch; margin-bottom:12px;">
-                <div class="input-group" style="flex:2; min-width:0; margin:0;"><label>Cantidad de Laboratorios</label><input type="number" min="0" value="${r.cantLab}" data-action-change="actualizarCantidad:${r.id},lab"></div>
+                <div class="input-group" style="flex:2; min-width:0; margin:0;"><label>Cantidad de Laboratorios</label><input type="number" min="1" value="${r.cantLab}" data-action-change="actualizarCantidad:${r.id},lab"></div>
                 <label class="toggle-avanzado" style="flex:1.3; min-width:130px; margin:24px 0 0 0;" title="Reemplaza tu nota más baja del laboratorio"><span>Recuperativo</span><input type="checkbox" data-action-change="toggleRecuperativoLab:${r.id}" ${r.usaRecuperativoLab ? 'checked' : ''}></label>
             </div>
             <div class="notas-grid">${inputsLabHTML}</div>
@@ -2068,4 +2093,360 @@ if (appVersionEl) appVersionEl.textContent = 'v' + APP_VERSION;
         window.addEventListener('resize', syncStickyTop);
     }
     window.addEventListener('scroll', syncStuck, { passive: true });
+})();
+/* ======================================================================
+   TUTORIAL INTERACTIVO (demo) — enseña a cargar un ramo paso a paso.
+   100% demo: los datos viven en una variable local y se descartan al
+   cerrar. Nunca toca `ramos`, ni malla_unif_ramos, ni Firestore; el único
+   localStorage que escribe es el flag `mpa_tutorial_demo_visto` que
+   controla la auto-apertura de la primera visita.
+   ====================================================================== */
+const LS_TUTORIAL_DEMO_VISTO = 'mpa_tutorial_demo_visto';
+
+const TD_TIPOS = {
+    matematicas: { icono: '📐', nombre: 'Ciencia Básica — Matemáticas', desc: 'Cátedras + talleres/controles. La cátedra pesa 100% y hay examen final.' },
+    fisica: { icono: '⚛️', nombre: 'Ciencia Básica — Física', desc: 'Como matemáticas, pero con laboratorio propio que pesa 30% contra la cátedra.' },
+    carrera: { icono: '💻', nombre: 'Ramo de Carrera', desc: 'Cátedra + 1 taller + laboratorio (70/30). El tipo que ves al precargar la malla.' },
+    sello: { icono: '🎗️', nombre: 'Curso Sello', desc: 'Promedio simple de cátedras con examen (se puede desactivar, ej: Inglés I).' },
+    formacion_basica: { icono: '🧭', nombre: 'Formación Básica', desc: 'Promedio simple de cátedras, sin examen.' },
+    transversal: { icono: '🔀', nombre: 'Transversal', desc: 'Promedio simple de cátedras, sin examen.' }
+};
+
+const TD_LABELS_CAT = ['N1', 'N2', 'N3'];
+const TD_TIPOS_SIMPLES = ['sello', 'formacion_basica', 'transversal'];
+const TD_STATE = { paso: 0, tipo: null, subt: 0, slots: [], ramo: null, avanzadoAbierto: false, visto: false };
+
+function tdRamo() {
+    return Object.assign(crearRamoNuevoTipo('Ramo de ejemplo', 'carrera'), { id: 'tutorial-demo' });
+}
+
+function tdSlotsDeRamo(r) {
+    const slots = [];
+    for (let i = 0; i < r.cantCat; i++) slots.push({ key: 'cat', i, label: `${TD_LABELS_CAT[i] || ('N' + (i + 1))} — Cátedra`, titulo: 'Nota de Cátedra', extra: '' });
+    if (r.usaPAR) slots.push({ key: 'par', label: 'Prueba PAR', titulo: 'Prueba PAR', extra: 'Reemplaza tu nota más baja de cátedra si la mejoras.' });
+    if (r.tieneEjercicios && r.cantEj > 0) for (let i = 0; i < r.cantEj; i++) slots.push({ key: 'ej', i, label: `T${i + 1} — Taller/Control`, titulo: 'Otras Actividades', extra: '' });
+    if (r.tieneLab && r.cantLab > 0) for (let i = 0; i < r.cantLab; i++) slots.push({ key: 'lab', i, label: `L${i + 1} — Laboratorio`, titulo: 'Laboratorio', extra: '' });
+    if (r.usaRecuperativoLab) slots.push({ key: 'recup', label: 'Recuperativo de Laboratorio', titulo: 'Recuperativo', extra: 'Reemplaza tu nota más baja de laboratorio si la mejoras.' });
+    if (r.tieneExamen) slots.push({ key: 'examen', label: 'Examen Final', titulo: 'Examen', extra: 'Déjalo en blanco si aún no lo rindes: la app calcula qué necesitas.' });
+    return slots;
+}
+
+window.__tdSlots = tdSlotsDeRamo;
+window.__tdLSKey = LS_TUTORIAL_DEMO_VISTO;
+window.__tdState = TD_STATE;
+
+function tdCantNum(v) {
+    const n = Math.floor(Number(String(v === undefined || v === null ? 0 : v).replace(',', '.')));
+    return isNaN(n) ? 0 : Math.max(0, n);
+}
+
+function tdRedimensionar(arr, n, fill) {
+    const a = Array.isArray(arr) ? arr.slice() : [];
+    while (a.length < n) a.push(fill);
+    return a.slice(0, n);
+}
+
+function tdAplicarCantidades() {
+    const r = TD_STATE.ramo;
+    if (!r) return;
+    const cat = document.getElementById('tdCantCat');
+    const ej = document.getElementById('tdCantEj');
+    const lab = document.getElementById('tdCantLab');
+    if (cat) r.cantCat = tdCantNum(cat.value);
+    if (ej) { r.cantEj = tdCantNum(ej.value); r.notasEj = tdRedimensionar(r.notasEj, r.cantEj, ''); }
+    if (lab) { r.cantLab = tdCantNum(lab.value); r.notasLab = tdRedimensionar(r.notasLab, r.cantLab, ''); }
+    r.notasCat = tdRedimensionar(r.notasCat, r.cantCat, '');
+    r.pesosCatInd = TD_TIPOS_SIMPLES.includes(r.tipoRamo)
+        ? pesosIguales(r.cantCat)
+        : redimensionarPreservando(r.pesosCatInd, r.cantCat).result;
+}
+
+// Ninguna cantidad puede ser 0: cada bloque presente debe tener al menos 1 nota.
+// Devuelve el mensaje de error si algo es inválido, o '' si todo es válido.
+function tdValidarCantidades() {
+    const checks = [
+        ['tdCantCat', 'El ramo debe tener al menos 1 nota de cátedra (cantidad ≥ 1).'],
+        ['tdCantEj', 'Debe haber al menos 1 taller/control (cantidad ≥ 1).'],
+        ['tdCantLab', 'Debe haber al menos 1 laboratorio (cantidad ≥ 1).'],
+    ];
+    for (const [id, msg] of checks) {
+        const el = document.getElementById(id);
+        if (el) {
+            const v = el.value;
+            const n = (v === '' || v === undefined || v === null) ? 0 : Number(String(v).replace(',', '.'));
+            if (isNaN(n) || !isFinite(n) || n < 1) return msg;
+        }
+    }
+    return '';
+}
+
+// Mensaje de error con diseño dentro del modal (reemplaza al alert del navegador):
+// se muestra en un banner rojo con animación de sacudida y se limpia al avanzar.
+function tdLimpiarError() {
+    const el = document.getElementById('tdError');
+    if (el) { el.classList.remove('visible'); el.textContent = ''; }
+}
+
+function tdMostrarError(msg) {
+    const el = document.getElementById('tdError');
+    if (!el) { alert(msg); return; }
+    el.textContent = msg;
+    el.classList.remove('visible');
+    void el.offsetWidth;
+    el.classList.add('visible');
+}
+
+function tdNotaActualValida() {
+    const inp = document.getElementById('tdNota');
+    if (!inp) return true;
+    const v = inp.value;
+    if (v === '' || v === undefined || v === null) return true;
+    const n = parseFloat(String(v).replace(',', '.'));
+    return !isNaN(n) && n >= 1 && n <= 7;
+}
+
+function tdGuardarNotaActual() {
+    const inp = document.getElementById('tdNota');
+    if (!inp) return;
+    const slot = TD_STATE.slots[TD_STATE.subt];
+    if (!slot) return;
+    const v = inp.value === undefined || inp.value === null ? '' : String(inp.value);
+    const n = v === '' ? '' : clampNota(v);
+    const r = TD_STATE.ramo;
+    if (slot.key === 'cat') r.notasCat[slot.i] = n;
+    else if (slot.key === 'ej') r.notasEj[slot.i] = n;
+    else if (slot.key === 'lab') r.notasLab[slot.i] = n;
+    else if (slot.key === 'par') r.notaPAR = n;
+    else if (slot.key === 'recup') r.notaRecuperativoLab = n;
+    else if (slot.key === 'examen') r.notaExamen = n;
+}
+
+function tdHTMLPesosDemo() {
+    const r = TD_STATE.ramo;
+    let html = '';
+    if (!TD_TIPOS_SIMPLES.includes(r.tipoRamo)) {
+        html += '<div class="pesos-ind-grid">';
+        for (let i = 0; i < r.cantCat; i++) {
+            html += `<div class="peso-ind-chip"><span>${TD_LABELS_CAT[i] || ('N' + (i + 1))}</span><input type="number" value="${r.pesosCatInd[i]}" step="1" min="0" max="100" disabled><span>%</span></div>`;
+        }
+        if (r.tieneEjercicios) html += `<div class="peso-ind-chip"><span>N4</span><input type="number" value="${r.pesoEjerciciosPct}" step="1" min="0" max="100" disabled><span>%</span></div>`;
+        html += '</div>';
+    }
+    if (r.tieneLab && r.tieneExamen !== false) {
+        html += `<div class="config-row">
+            <div class="input-group"><label>Peso Cátedra (%)</label><input type="number" value="${r.pesoCatPct}" disabled></div>
+            <div class="input-group"><label>Peso Laboratorio (%)</label><input type="number" value="${r.pesoLabPct}" disabled></div>
+        </div>`;
+    }
+    html += `<div class="config-row">
+        <div class="input-group"><label>Peso Presentación (%)</label><input type="number" value="${r.pesoPresentacionPct}" disabled></div>
+        <div class="input-group"><label>Peso Examen (%)</label><input type="number" value="${r.pesoExamenFinalPct}" disabled></div>
+    </div>
+    <div class="config-row">
+        <div class="input-group"><label>Eximición</label><input type="number" step="0.1" min="1" max="7" value="${r.notaEximicionMeta}" disabled></div>
+        <div class="input-group"><label>Aprobación</label><input type="number" step="0.1" min="1" max="7" value="${r.notaAprobacion}" disabled></div>
+    </div>`;
+    return html;
+}
+
+function tdHTMLPaso(paso) {
+    const S = TD_STATE;
+    if (paso === 0) return `
+        <h3 class="td-titulo-paso">Simulemos cargar un ramo 🚀</h3>
+        <p class="td-texto">Te mostraré el flujo real de "Mis Ramos" paso a paso: elegir el tipo, la configuración avanzada, las cantidades y tus notas.</p>
+        <p class="td-texto">Es <strong>100% demo</strong>: cuando termines o salgas, no se guarda nada en tu malla.</p>`;
+    if (paso === 1) return `
+        <h3 class="td-titulo-paso">Paso 1 — Elige el tipo de ramo</h3>
+        <p class="td-texto">Cada tipo define qué campos verás (talleres, laboratorio, examen). Toca uno para continuar.</p>
+        <div class="td-tipos">${Object.keys(TD_TIPOS).map(t => `
+            <button type="button" class="tipo-ramo-opcion${S.tipo === t ? ' sel' : ''}" data-action="td-tipo:${t}">
+                <span class="tr-nombre">${TD_TIPOS[t].icono} ${TD_TIPOS[t].nombre}</span>
+                <span class="tr-desc">${TD_TIPOS[t].desc}</span>
+            </button>`).join('')}</div>`;
+    if (paso === 2) {
+        const abierto = S.avanzadoAbierto;
+        return `
+            <h3 class="td-titulo-paso">Paso 2 — La "Configuración avanzada"</h3>
+            <p class="td-texto">Presiona el botón <strong>⚙️ Configuración avanzada</strong> para revelar los pesos y umbrales del ramo.</p>
+            <div class="td-card">
+                <div class="ramo-nombre">${TD_TIPOS[S.tipo].icono} ${TD_TIPOS[S.tipo].nombre}</div>
+                <div class="config-box">
+                    <button type="button" class="btn-config-avanzado" id="tdDemoBtnAvanzado" aria-expanded="${abierto}" data-action="td-toggle-avanzado">
+                        <span>⚙️ Configuración avanzada</span><span class="chev">${abierto ? '▴' : '▾'}</span>
+                    </button>
+                    <div class="config-avanzado-wrap ${abierto ? 'abierto' : ''}" id="tdDemoWrap">
+                        <div class="config-avanzado-inner">
+                            <div class="notas-subtitulo">Pesos y umbrales</div>
+                            ${tdHTMLPesosDemo()}
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+    }
+    if (paso === 3) {
+        const r = S.ramo;
+        const rejilla = [];
+        rejilla.push(`<div class="input-group" style="flex:2; min-width:0; margin:0;"><label>Cantidad de Cátedras</label><input type="number" min="1" id="tdCantCat" value="${r.cantCat}"></div>`);
+        if (r.tieneEjercicios) rejilla.push(`<div class="input-group" style="flex:2; min-width:0; margin:0;"><label>Cantidad de Talleres/Controles</label><input type="number" min="1" id="tdCantEj" value="${r.cantEj}"></div>`);
+        if (r.tieneLab) rejilla.push(`<div class="input-group" style="flex:2; min-width:0; margin:0;"><label>Cantidad de Laboratorios</label><input type="number" min="1" id="tdCantLab" value="${r.cantLab}"></div>`);
+        return `
+            <h3 class="td-titulo-paso">Paso 3 — Las cantidades</h3>
+            <p class="td-texto">Define cuántas notas hay en cada bloque. En la app real, al cambiar la cantidad se conservan tus notas y se reequilibran los pesos.</p>
+            <div class="td-card">
+                <div class="ramo-nombre">${TD_TIPOS[S.tipo].icono} ${TD_TIPOS[S.tipo].nombre}</div>
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">${rejilla.join('')}</div>
+            </div>`;
+    }
+    if (paso === 4) {
+        const slot = S.slots[S.subt];
+        const r = S.ramo;
+        const valor = slot.key === 'cat' ? (r.notasCat[slot.i] ?? '')
+            : slot.key === 'ej' ? (r.notasEj[slot.i] ?? '')
+            : slot.key === 'lab' ? (r.notasLab[slot.i] ?? '')
+            : slot.key === 'par' ? (r.notaPAR ?? '')
+            : slot.key === 'recup' ? (r.notaRecuperativoLab ?? '')
+            : (r.notaExamen ?? '');
+        return `
+            <h3 class="td-titulo-paso">Paso 4 — Tus notas (${S.subt + 1} de ${S.slots.length})</h3>
+            <p class="td-texto">${slot.titulo}: <strong>${slot.label}</strong>.${slot.extra ? ' ' + slot.extra : ''}</p>
+            <div class="td-card">
+                <div class="notas-grid" style="justify-content:center;"><div class="celda-nota"><input type="number" step="0.1" min="1" max="7" id="tdNota" value="${valor}" placeholder="${slot.label.split(' — ')[0]}"></div></div>
+                <p class="td-aviso">Puedes dejarla en blanco: la app avisa qué nota necesitas para aprobar o eximirte.</p>
+            </div>`;
+    }
+    return `
+        <h3 class="td-titulo-paso">Paso 5 — Resultado 🎉</h3>
+        <p class="td-texto">Así calcula la app tu <strong>nota de presentación</strong> y lo que necesitas en el examen (motor real, mismos umbrales).</p>
+        <div class="td-card">
+            <div class="resultado-box" id="res-tutorial-demo" style="display:block; margin-top:0;"></div>
+        </div>
+        <p class="td-aviso">Esto fue una demo: al salir no se guardó nada en tu malla.</p>`;
+}
+
+function tdCalcular() {
+    const r = TD_STATE.ramo;
+    if (!r) return;
+    try {
+        const idx = ramos.findIndex(x => x.id === 'tutorial-demo');
+        if (idx === -1) ramos.push(r);
+        try {
+            window.calcularRamoNuevo('tutorial-demo', true);
+        } finally {
+            const i = ramos.findIndex(x => x.id === 'tutorial-demo');
+            if (i !== -1) ramos.splice(i, 1);
+        }
+    } catch (err) {
+        console.error('Tutorial demo: no se pudo calcular la presentación', err);
+    }
+}
+
+function renderTutDemo() {
+    const S = TD_STATE;
+    tdLimpiarError();
+    const cont = document.getElementById('tdContenido');
+    if (!cont) return;
+    const bar = document.getElementById('tdProgreso');
+    const pasoNum = document.getElementById('tdPasoActual');
+    const btnAtras = document.getElementById('tdBtnAtras');
+    const btnSig = document.getElementById('tdBtnSiguiente');
+    if (bar) bar.style.width = Math.round(((S.paso + 1) / 6) * 100) + '%';
+    if (pasoNum) pasoNum.textContent = String(S.paso + 1);
+    if (btnAtras) btnAtras.style.display = S.paso === 0 ? 'none' : '';
+    if (btnSig) btnSig.textContent = S.paso === 0 ? 'Comenzar →' : (S.paso === 5 ? 'Finalizar ✓' : 'Siguiente →');
+    cont.innerHTML = tdHTMLPaso(S.paso);
+    if (S.paso === 5) tdCalcular();
+    if (S.paso === 4) {
+        const inp = document.getElementById('tdNota');
+        if (inp) setTimeout(() => { try { inp.focus(); } catch (e) {} }, 30);
+    }
+}
+
+window.tdTipo = (tipo) => {
+    if (TD_TIPOS[tipo]) { TD_STATE.tipo = tipo; tdLimpiarError(); renderTutDemo(); }
+};
+
+window.tdToggleAvanzado = () => {
+    TD_STATE.avanzadoAbierto = !TD_STATE.avanzadoAbierto;
+    tdLimpiarError();
+    const wrap = document.getElementById('tdDemoWrap');
+    if (wrap) wrap.classList.toggle('abierto', TD_STATE.avanzadoAbierto);
+    const btn = document.getElementById('tdDemoBtnAvanzado');
+    if (btn) {
+        btn.setAttribute('aria-expanded', TD_STATE.avanzadoAbierto ? 'true' : 'false');
+        const chev = btn.querySelector('.chev');
+        if (chev) chev.textContent = TD_STATE.avanzadoAbierto ? '▴' : '▾';
+    }
+};
+
+window.tdSiguiente = () => {
+    const S = TD_STATE;
+    if (S.paso === 1 && !S.tipo) { tdMostrarError('Selecciona un tipo de ramo para continuar.'); return; }
+    if (S.paso === 2 && !S.avanzadoAbierto) { tdMostrarError('Haz clic en "⚙️ Configuración avanzada" para continuar.'); return; }
+    if (S.paso === 3) {
+        const msgCant = tdValidarCantidades();
+        if (msgCant) { tdMostrarError(msgCant); return; }
+        tdAplicarCantidades();
+    }
+    if (S.paso === 4) {
+        if (!tdNotaActualValida()) { tdMostrarError('Ingresa una nota entre 1.0 y 7.0, o déjala vacía.'); return; }
+        tdGuardarNotaActual();
+        if (S.subt < S.slots.length - 1) { S.subt++; renderTutDemo(); return; }
+        S.paso = 5;
+        renderTutDemo();
+        return;
+    }
+    if (S.paso === 5) { cerrarTutorialDemo(); return; }
+    S.paso++;
+    if (S.paso === 4) { S.slots = tdSlotsDeRamo(S.ramo); S.subt = 0; }
+    renderTutDemo();
+};
+
+window.tdAtras = () => {
+    const S = TD_STATE;
+    if (S.paso === 4 && S.subt > 0) { S.subt--; renderTutDemo(); return; }
+    if (S.paso > 0) { S.paso--; renderTutDemo(); }
+};
+
+function tdFinalizar() {
+    if (TD_STATE.visto) return;
+    TD_STATE.visto = true;
+    localStorage.setItem(LS_TUTORIAL_DEMO_VISTO, '1');
+    TD_STATE.ramo = null;
+    TD_STATE.slots = [];
+}
+
+window.openTutorialDemo = () => {
+    const modal = document.getElementById('tutorialDemoModal');
+    if (!modal) return;
+    TD_STATE.ramo = tdRamo();
+    TD_STATE.paso = 0;
+    TD_STATE.tipo = null;
+    TD_STATE.subt = 0;
+    TD_STATE.slots = [];
+    TD_STATE.avanzadoAbierto = false;
+    renderTutDemo();
+    openModal('tutorialDemoModal');
+};
+
+window.cerrarTutorialDemo = () => {
+    closeModal('tutorialDemoModal');
+    tdFinalizar();
+};
+
+(function tdWatchCierre() {
+    const modal = document.getElementById('tutorialDemoModal');
+    if (!modal || typeof MutationObserver === 'undefined') return;
+    const obs = new MutationObserver(() => {
+        if (modal.getAttribute('aria-hidden') === 'true') tdFinalizar();
+    });
+    obs.observe(modal, { attributes: true, attributeFilter: ['aria-hidden'] });
+})();
+
+(function tdAutoOpen() {
+    if (localStorage.getItem(LS_TUTORIAL_DEMO_VISTO) === '1') return;
+    if (!document.getElementById('tutorialDemoModal')) return;
+    setTimeout(() => {
+        if (document.querySelector && document.querySelector('.modal-abierto')) return;
+        window.openTutorialDemo();
+    }, 600);
 })();
