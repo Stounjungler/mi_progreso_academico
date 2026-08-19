@@ -210,9 +210,6 @@ html.sesion-bloqueada, html.sesion-bloqueada body {
 
 .link-malla-oficial { color: var(--accent); font-weight: 700; text-decoration: underline; cursor: pointer; }
 .link-malla-oficial:hover { color: var(--accent); opacity: 0.8; }
-#mallaOficialModal.modal-overlay { padding: 12px; }
-#mallaOficialModal .modal-content-img { max-width: 98vw; width: 98vw; max-height: 96vh; padding: 20px; }
-.malla-oficial-img { width: 100%; height: auto; border-radius: 10px; border: 1.5px solid var(--navy-border); display: block; }
 
 .ramo-chip-slot { display: flex; margin-bottom: 8px; }
 .ramo-chip-slot.vacio { visibility: hidden; }
@@ -422,19 +419,12 @@ html.sesion-bloqueada, html.sesion-bloqueada body {
     .usuario-nombre { max-width: 90px; font-size: 11px; }
     .usuario-sync { font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
     .usuario-info .btn-ghost { padding: 6px 10px; font-size: 11px; flex-shrink: 0; }
-
-    #mallaOficialModal .modal-content-img { padding: 14px; max-width: 100vw; width: 100vw; height: 100vh; max-height: 100vh;
-        border-radius: 0; box-sizing: border-box; display: flex; flex-direction: column; overflow-y: auto; }
-    #mallaOficialModal.modal-overlay { padding: 0; align-items: stretch; justify-content: stretch; }
-    #mallaOficialModal .modal-content-img h2 { font-size: 16px; flex-shrink: 0; }
-    #mallaOficialModal .modal-content-img p { font-size: 12.5px; flex-shrink: 0; }
-    #mallaOficialModal .malla-oficial-img { flex: 1 1 auto; min-height: 0; width: auto; max-width: 100%; height: auto;
-        object-fit: contain; margin: 0 auto; }
-    #mallaOficialModal .modal-content-img > .btn { flex-shrink: 0; }
 }
 
 /* Utilities added to replace inline styles moved from index.html */
 .noscript-warning { padding: 16px; background: #fff3cd; color: #856404; text-align: center; }
+.restaurar-aviso { margin: 10px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--warning-soft);
+    border: 1px solid var(--warning); color: var(--warning); font-size: 13px; font-weight: 700; line-height: 1.4; }
 .hidden { display: none !important; }
 .toolbar-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .google-button-placeholder { display: flex; justify-content: center; margin-top: 14px; min-height: 44px; }

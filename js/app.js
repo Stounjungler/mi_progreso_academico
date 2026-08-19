@@ -318,12 +318,11 @@ document.addEventListener('click', (e) => {
                 if (e.target && e.target.id === target) cerrarModalSegun(target);
                 break;
             }
-            case 'open-malla-modal': e.preventDefault(); openModal('mallaOficialModal'); break;
+            case 'descargarMallaOficial': e.preventDefault(); if (typeof window.descargarMallaOficial === 'function') window.descargarMallaOficial(); break;
             case 'open-tutorial': openModal('tutorialModal'); break;
             case 'open-help': openModal('guiaModal'); break;
             case 'close-tutorial': closeModal('tutorialModal'); break;
             case 'close-help': closeModal('guiaModal'); break;
-            case 'close-malla-modal': closeModal('mallaOficialModal'); break;
             case 'toggleTema': if (typeof window.toggleTema === 'function') window.toggleTema(); break;
             case 'iniciarSesionConGoogle': if (typeof window.iniciarSesionConGoogle === 'function') window.iniciarSesionConGoogle(); break;
             case 'abrirEnNavegadorReal': if (typeof window.abrirEnNavegadorReal === 'function') window.abrirEnNavegadorReal(); break;
@@ -622,7 +621,7 @@ function _renderMallaInterno() {
         </div>
 
             <div class="toolbar">
-            <span class="small-muted-text">🔗 Prerrequisitos precargados desde tu malla 2025. Los que tenían flechas cruzadas quedaron sin cargar — <a href="#" class="link-malla-oficial" data-action="open-malla-modal">revísalos aquí</a>.</span>
+            <span class="small-muted-text">🔗 Prerrequisitos precargados desde tu malla 2025. Los que tenían flechas cruzadas quedaron sin cargar — <a href="#" class="link-malla-oficial" data-action="descargarMallaOficial">descárgala aquí</a>.</span>
             <button class="btn-prereq ${modoPrereq ? 'activo' : ''}" id="btnPrereq">${modoPrereq ? '✓ Listo — salir de edición' : '✏️ Editar prerrequisitos'}</button>
         </div>
 
@@ -780,6 +779,39 @@ window.descargarRespaldo = () => {
 
 window.activarInputRespaldo = () => {
     document.getElementById('inputRespaldo').click();
+};
+
+window.descargarMallaOficial = () => {
+    const rutaImagen = 'Mallas FINARQ/malla-2025-icci.jpg';
+    const img = new Image();
+    img.onload = () => {
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            canvas.toBlob((blob) => {
+                if (!blob) { alert('No se pudo generar la imagen. Intenta de nuevo.'); return; }
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'Malla Nueva (2025) ICCI.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 'image/png');
+        } catch (err) {
+            console.error('Error al generar PNG de la malla', err);
+            alert('No se pudo descargar la malla. Intenta de nuevo.');
+        }
+    };
+    img.onerror = () => {
+        console.error('No se pudo cargar la imagen de la malla', rutaImagen);
+        alert('No se encontró la imagen de la malla. Intenta de nuevo más tarde.');
+    };
+    img.src = rutaImagen;
 };
 
 let _respaldoPendiente = null;
