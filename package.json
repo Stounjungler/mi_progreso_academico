@@ -7,6 +7,7 @@
     "build": "npm run build:config",
     "serve": "npx http-server -c-1 .",
     "smoke-test": "node scripts/smoke-test.js",
+    "test": "node --test tests/test-export.mjs",
     "emulators:start": "npx firebase emulators:start --only auth,firestore",
     "test:emulator-auth": "node scripts/test-emulator-auth.js"
   },
