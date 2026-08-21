@@ -402,6 +402,11 @@ html.sesion-bloqueada, html.sesion-bloqueada body {
 .modal-overlay.modal-abierto .modal-content { transform: translateY(0) scale(1); opacity: 1; }
 .modal-overlay.modal-cerrando .modal-content { transition: transform var(--dur-mid) var(--ease-in-hard), opacity var(--dur-mid) var(--ease-in-hard); }
 .modal-content h2 { margin-top: 0; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-main); }
+.modal-content-aviso { max-width: 400px; padding: 24px; }
+.modal-content-aviso p { margin: 0 0 8px; color: var(--text-muted); font-size: 13.5px; line-height: 1.5; }
+.modal-overlay-aviso { z-index: 1100; }
+.nota-fija-hint { display: block; margin-top: 4px; font-size: 9.5px; font-weight: 600; color: var(--text-faint); line-height: 1.25; }
+.input-group input[readonly] { cursor: not-allowed; color: var(--text-muted); background: var(--navy-700); border-style: dashed; }
 .modal-label { display: block; font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
 .modal-input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--navy-border); border-radius: 10px; box-sizing: border-box;
     font-size: 15px; background: var(--navy-950); color: var(--text-main); font-family: inherit; outline: none;

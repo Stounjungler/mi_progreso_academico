@@ -292,6 +292,17 @@
         </div>
     </div>
 
+    <!-- Aviso pequeño de cantidades por tipo de ramo (bloqueante en fijos, informativo en ejercicios) -->
+    <div id="avisoCantidadModal" class="modal-overlay modal-overlay-aviso" aria-hidden="true" data-action="overlay-click" data-target="avisoCantidadModal">
+        <div class="modal-content modal-content-aviso" role="dialog" aria-modal="true" aria-labelledby="avisoCantidadTitulo">
+            <h2 id="avisoCantidadTitulo">Cantidad no permitida</h2>
+            <p id="avisoCantidadMensaje"></p>
+            <div class="dialog-actions" style="justify-content:flex-end; margin-top: 6px;">
+                <button class="btn btn-primary" data-action="cerrar-aviso-cantidad">Entendido</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Login overlay -->
     <div id="loginOverlay" class="login-overlay" aria-hidden="true">
             <div class="login-card" id="loginCardNormal">

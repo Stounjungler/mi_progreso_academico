@@ -331,8 +331,19 @@ console.log('\nTODAS LAS PRUEBAS PASARON ✅');
   if (norm.pesoCatPct !== 70) throw new Error('T7b: pesoCatPct inválido debería caer al fallback 70, dio ' + norm.pesoCatPct);
   if (norm.notaEximicionMeta !== 7) throw new Error('T7b: notaEximicionMeta 9.9 debería clampear a 7, dio ' + norm.notaEximicionMeta);
   if (norm.promedioEjManual !== 6.4) throw new Error('T7b: promedioEjManual con coma debería ser 6.4, dio ' + norm.promedioEjManual);
-  if (JSON.stringify(norm.notasCat) !== JSON.stringify(['', '', 6.5])) throw new Error('T7b: notasCat mal coaccionadas: ' + JSON.stringify(norm.notasCat));
+  // normalizarRamo redimensiona los arreglos de notas para que coincidan con la
+  // cantidad coaccionada: con cantCat=0 no pueden quedar 3 notas colgando.
+  if (JSON.stringify(norm.notasCat) !== JSON.stringify([])) throw new Error('T7b: notasCat debería redimensionarse a la cantidad coaccionada: ' + JSON.stringify(norm.notasCat));
+  if (JSON.stringify(norm.pesosCatInd) !== JSON.stringify([])) throw new Error('T7b: pesosCatInd debería redimensionarse a cantCat');
   if (norm.tieneLab !== true) throw new Error('T7b: tieneLab 1 debería coaccionar a true');
+
+  // 7e. normalizarRamo redimensiona hacia ABAJO cuando sobran notas (respaldos viejos).
+  const sobran = makeRamo({ id: 'rsobra', cantCat: 3, notasCat: ['6', '5', '4', '3', '2'], pesosCatInd: [40, 30, 30, 15, 10], cantEj: 2, notasEj: ['7', '6', '5'] });
+  const normSobran = globalThis.__normalizarRamo(sobran);
+  if (normSobran.cantCat !== 3) throw new Error('T7e: cantCat debería quedar en 3');
+  if (JSON.stringify(normSobran.notasCat) !== JSON.stringify([6, 5, 4])) throw new Error('T7e: notasCat debería recortarse a 3: ' + JSON.stringify(normSobran.notasCat));
+  if (JSON.stringify(normSobran.pesosCatInd) !== JSON.stringify([40, 30, 30])) throw new Error('T7e: pesosCatInd debería recortarse a 3: ' + JSON.stringify(normSobran.pesosCatInd));
+  if (JSON.stringify(normSobran.notasEj) !== JSON.stringify([7, 6])) throw new Error('T7e: notasEj debería recortarse a 2: ' + JSON.stringify(normSobran.notasEj));
 
   // 7c. renderCardNuevo sobre el ramo normalizado NO debe filtrar el payload.
   const html = globalThis.__renderCardNuevo(norm);
@@ -451,24 +462,43 @@ console.log('\nTODAS LAS PRUEBAS PASARON ✅');
 {
   const errEl = getEl('tdError');
 
-  // 10a. Motor real: las cátedras nunca pueden quedar en 0 (mínimo 1).
+  // 10a. Motor real: validación de cantidades según el tipo de ramo.
+  // En "fisica": cátedra fija en 3 y laboratorio fijo en 5 (readonly + reversión
+  // defensiva con modal); ejercicios clampa a mínimo 1 y avisa sobre 6 sin bloquear.
   const r10 = makeRamo({ id: 'r10', tipoRamo: 'fisica', tieneEjercicios: true, cantEj: 3, notasEj: ['', '', ''], tieneLab: true, cantLab: 5, notasLab: ['', '', '', '', ''] });
   localStorage.setItem('malla_unif_ramos', JSON.stringify([r10]));
   window.recargarRamosDesdeStorage();
   const leer = () => JSON.parse(localStorage.getItem('malla_unif_ramos'))[0];
   window.actualizarCantidad('r10', 'cat', { value: '0' });
-  if (leer().cantCat !== 1) throw new Error('T10a: cantCat=0 no se clampa a 1');
-  if (leer().notasCat.length !== 1) throw new Error('T10a: notasCat debería redimensionarse a 1');
+  if (leer().cantCat !== 3) throw new Error('T10a: cantCat debería quedar fija en 3 para fisica, dio ' + leer().cantCat);
+  if (leer().notasCat.length !== 3) throw new Error('T10a: notasCat debería mantenerse en 3');
+  window.actualizarCantidad('r10', 'cat', { value: '4' });
+  if (leer().cantCat !== 3) throw new Error('T10a: cantCat=4 debería revertirse a 3 para fisica');
+  if (!/cátedra/.test(getEl('avisoCantidadMensaje').textContent)) throw new Error('T10a: revertir cátedra debería mostrar el modal explicando el valor fijo');
   window.actualizarCantidad('r10', 'cat', { value: '3' });
-  if (leer().cantCat !== 3) throw new Error('T10a: cantCat=3 no se aplica');
+  if (leer().cantCat !== 3) throw new Error('T10a: cantCat=3 debe aplicarse tal cual');
   window.actualizarCantidad('r10', 'ej', { value: '0' });
   if (leer().cantEj !== 1) throw new Error('T10a: talleres no pueden quedar en 0');
   if (leer().notasEj.length !== 1) throw new Error('T10a: notasEj debería redimensionarse a 1');
   window.actualizarCantidad('r10', 'lab', { value: '0' });
-  if (leer().cantLab !== 1) throw new Error('T10a: lab no puede quedar en 0');
+  if (leer().cantLab !== 5) throw new Error('T10a: cantLab debería quedar fija en 5 para fisica, dio ' + leer().cantLab);
   window.actualizarCantidad('r10', 'ej', { value: '2' });
   window.actualizarCantidad('r10', 'lab', { value: '5' });
-  if (leer().cantEj !== 2 || leer().cantLab !== 5) throw new Error('T10a: valores > 0 deben aplicarse tal cual');
+  if (leer().cantEj !== 2 || leer().cantLab !== 5) throw new Error('T10a: valores válidos deben aplicarse tal cual');
+
+  // 10d. Aviso NO bloqueante de ejercicios > máximo esperado (6), una sola vez por ramo.
+  window.actualizarCantidad('r10', 'ej', { value: '7' });
+  if (leer().cantEj !== 7) throw new Error('T10d: ejercicios sobre el máximo deben aplicarse igual (aviso no bloqueante)');
+  const primerMensaje = getEl('avisoCantidadMensaje').textContent;
+  if (primerMensaje === '' || !/6/.test(primerMensaje)) throw new Error('T10d: debería haberse mostrado el modal de aviso, quedó: ' + primerMensaje);
+  // insistir en el mismo ramo no vuelve a disparar el aviso (ya aceptado).
+  window.actualizarCantidad('r10', 'ej', { value: '8' });
+  window.actualizarCantidad('r10', 'ej', { value: '7' });
+  if (getEl('avisoCantidadMensaje').textContent !== primerMensaje) throw new Error('T10d: el modal no debería re-dispararse al insistir');
+  // el aviso se rearma si el valor vuelve a ≤6 y sube de nuevo.
+  window.actualizarCantidad('r10', 'ej', { value: '6' });
+  window.actualizarCantidad('r10', 'ej', { value: '9' });
+  if (getEl('avisoCantidadMensaje').textContent === primerMensaje || !/9/.test(getEl('avisoCantidadMensaje').textContent)) throw new Error('T10d: el aviso debería re-dispararse tras volver al límite y subir otra vez');
 
   // 10b. Tutorial paso 3: con 0 en todas las cantidades NO avanza y muestra el error.
   localStorage.removeItem('mpa_tutorial_demo_visto');

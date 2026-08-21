@@ -343,6 +343,7 @@ document.addEventListener('click', (e) => {
             case 'cerrar-confirmar-restaurar': if (typeof window.cerrarConfirmarRestaurarModal === 'function') window.cerrarConfirmarRestaurarModal(); break;
             case 'confirmar-restaurar-respaldo': if (typeof window.confirmarRestaurarRespaldo === 'function') window.confirmarRestaurarRespaldo(); break;
             case 'cerrar-prereq': if (typeof window.cerrarPrereqModal === 'function') window.cerrarPrereqModal(); break;
+            case 'cerrar-aviso-cantidad': if (typeof window.cerrarAvisoCantidad === 'function') window.cerrarAvisoCantidad(); break;
             case 'entrarModoInvitado': if (typeof window.entrarModoInvitado === 'function') window.entrarModoInvitado(); break;
             default:
                 // generic: call a global function if exists
@@ -757,6 +758,23 @@ let ramos = cargarJSON(LS_RAMOS, []);
 const _R_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const _TIPOS_RAMO = new Set(['matematicas', 'fisica', 'carrera', 'sello', 'formacion_basica', 'transversal']);
 
+// Límites de cantidad por tipo de ramo (extensible: agrega un tipo y sus
+// límites aquí; se puede ajustar por tipo si algún día varían).
+//   fijo      → la cantidad está bloqueada en ese valor (readonly + reversión defensiva con modal).
+//   maxAviso  → cantidad por encima dispara un aviso NO bloqueante (una vez por ramo+sección).
+//   null      → la sección no aplica a ese tipo (sin límite; el input ni se renderiza en flujo normal).
+const LIMITES_CANTIDAD_POR_TIPO = {
+    matematicas: { cat: { fijo: 3 }, ej: { maxAviso: 6 }, lab: null },
+    fisica:      { cat: { fijo: 3 }, ej: { maxAviso: 6 }, lab: { fijo: 5 } },
+    carrera:     { cat: { fijo: 3 }, ej: { maxAviso: 6 }, lab: { fijo: 5 } },
+    sello:       { cat: { fijo: 3 }, ej: null, lab: null },
+    formacion_basica: { cat: { fijo: 3 }, ej: null, lab: null },
+    transversal: { cat: { fijo: 3 }, ej: null, lab: null }
+};
+// Recuerda qué ramo ya aceptó el aviso de "más de X ejercicios" (clave: ramoId).
+// Se rearma cuando la cantidad vuelve a estar dentro del límite.
+const _avisoEjAceptado = {};
+
 function coercePct(valor, fallback) {
     if (valor === '' || valor === undefined || valor === null) return fallback;
     const n = Number(String(valor).replace(',', '.'));
@@ -803,6 +821,21 @@ function normalizarRamo(r) {
     r.cantCat = coerceInt(r.cantCat, 3);
     r.cantEj = coerceInt(r.cantEj, 0);
     r.cantLab = coerceInt(r.cantLab, 0);
+
+    // Redimensionar los arreglos para que coincidan con la cantidad coaccionada
+    // (p. ej. respaldos viejos con cantCat=3 pero notasCat de 5 entradas): la
+    // cantidad es la fuente de verdad del render y del cálculo, así que recorto
+    // (o relleno con '') las notas y los pesos de cátedra.
+    const redim = (arr, n) => {
+        const a = arr || [];
+        const out = Array(n).fill('');
+        for (let i = 0; i < n && i < a.length; i++) out[i] = a[i];
+        return out;
+    };
+    r.notasCat = redim(r.notasCat, r.cantCat);
+    r.notasEj = redim(r.notasEj, r.cantEj);
+    r.notasLab = redim(r.notasLab, r.cantLab);
+    r.pesosCatInd = redim(r.pesosCatInd, r.cantCat);
 
     // Pesos (0–100).
     r.pesosCatInd = Array.isArray(r.pesosCatInd) ? r.pesosCatInd.map(v => coercePct(v, 0)) : [];
@@ -1146,6 +1179,17 @@ function redimensionarPreservando(arr, nuevaCant) {
     return { result, excedente: [] };
 }
 
+// Modal pequeño y genérico de aviso de cantidades (bloqueante para los fijos y
+// meramente informativo para el aviso de ejercicios, que NO revierte el cambio).
+window.mostrarAvisoCantidad = (titulo, mensaje) => {
+    const t = document.getElementById('avisoCantidadTitulo');
+    const m = document.getElementById('avisoCantidadMensaje');
+    if (t) t.textContent = titulo;
+    if (m) m.textContent = mensaje;
+    openModal('avisoCantidadModal');
+};
+window.cerrarAvisoCantidad = () => closeModal('avisoCantidadModal');
+
 window.actualizarCantidad = (ramoId, categoria, el) => {
     const r = ramos.find(x => x.id === ramoId);
     if (!r) return;
@@ -1153,6 +1197,32 @@ window.actualizarCantidad = (ramoId, categoria, el) => {
     // laboratorio) necesita al menos 1 nota que ingresar. Con 0 el bloque
     // no aportaría ninguna nota.
     const nuevaCant = Math.max(1, parseInt(el ? el.value : '') || 0);
+    const limite = (LIMITES_CANTIDAD_POR_TIPO[r.tipoRamo] || {})[categoria] || null;
+
+    // Secciones de cantidad fija (cátedra/laboratorio): si por cualquier vía
+    // llega un valor distinto al fijo, se revierte a ese valor y se avisa con
+    // un modal en vez de bloquear en silencio.
+    if (limite && typeof limite.fijo === 'number' && nuevaCant !== limite.fijo) {
+        if (el) el.value = limite.fijo;
+        const seccion = categoria === 'cat' ? 'notas de cátedra' : 'notas de laboratorio';
+        mostrarAvisoCantidad('Cantidad fija', `El tipo de ramo "${etiquetaTipo(r.tipoRamo)}" admite exactamente ${limite.fijo} ${seccion}. El valor se mantiene en ${limite.fijo}.`);
+        return;
+    }
+
+    // Ejercicios/talleres: aviso NO bloqueante la primera vez que se supera el
+    // máximo esperado. El cambio se aplica igual (el usuario puede insistir).
+    // Se rearma si el valor vuelve a estar dentro del límite.
+    if (categoria === 'ej' && limite && typeof limite.maxAviso === 'number') {
+        if (nuevaCant > limite.maxAviso) {
+            if (!_avisoEjAceptado[ramoId]) {
+                _avisoEjAceptado[ramoId] = true;
+                mostrarAvisoCantidad('Más de lo esperado', `Según el tipo de ramo seleccionado ("${etiquetaTipo(r.tipoRamo)}"), lo esperable es un máximo de ${limite.maxAviso} notas en ejercicios/talleres. Puedes continuar con ${nuevaCant} de todos modos.`);
+            }
+        } else {
+            delete _avisoEjAceptado[ramoId];
+        }
+    }
+
     const esPromedioSimple = (r.tipoRamo === 'sello' || r.tipoRamo === 'formacion_basica' || r.tipoRamo === 'transversal');
     const cache = _respaldoCantidad[ramoId] || (_respaldoCantidad[ramoId] = {});
     // Combina las notas actuales con las excedentes guardadas (del mismo ramo y
@@ -1182,6 +1252,7 @@ window.cambiarTipoRamo = (id, el) => {
     base.id = r.id;
     ramos = ramos.map(x => x.id === id ? base : x);
     delete _respaldoCantidad[id];
+    delete _avisoEjAceptado[id];
     guardarEnStorage(); renderRamos();
 };
 
@@ -1617,6 +1688,22 @@ function renderCardNuevo(r) {
 
     const vinculado = esRamoVinculado(r.id);
 
+    // Cantidades por tipo de ramo: cátedra y laboratorio quedan fijos (readonly
+    // con indicio visual) cuando el tipo lo define; ejercicios conserva un aviso
+    // de máximo esperado como tooltip.
+    const lims = LIMITES_CANTIDAD_POR_TIPO[r.tipoRamo] || {};
+    const inputCantidad = (categoria, valor, accion, fijo, maxAviso) => {
+        const data = accion ? ` data-action-change="${accion}"` : '';
+        const attrs = fijo !== null
+            ? ` min="1" value="${valor}" readonly${data} title="Fijo: ${fijo} ${categoria === 'cat' ? 'notas de cátedra' : 'notas de laboratorio'} según el tipo de ramo"`
+            : ` min="1" value="${valor}"${data}${maxAviso ? ` title="Máximo esperado: ${maxAviso} notas según el tipo de ramo"` : ''}`;
+        const hint = fijo !== null ? `<span class="nota-fija-hint">🔒 Fijo: ${fijo} según tipo de ramo</span>` : '';
+        return `<input type="number"${attrs}>${hint}`;
+    };
+    const inputCatHTML = inputCantidad('cat', r.cantCat, `actualizarCantidad:${r.id},cat`, (lims.cat && typeof lims.cat.fijo === 'number') ? lims.cat.fijo : null, null);
+    const inputEjHTML = inputCantidad('ej', r.cantEj, `actualizarCantidad:${r.id},ej`, null, (lims.ej && typeof lims.ej.maxAviso === 'number') ? lims.ej.maxAviso : null);
+    const inputLabHTML = inputCantidad('lab', r.cantLab, `actualizarCantidad:${r.id},lab`, (lims.lab && typeof lims.lab.fijo === 'number') ? lims.lab.fijo : null, null);
+
     return `
         <div>
             <div class="ramo-header">
@@ -1674,7 +1761,7 @@ function renderCardNuevo(r) {
 
             <div class="notas-subtitulo">Notas de Cátedra</div>
             <div style="display:flex; gap:12px; align-items:stretch; margin-bottom:12px;">
-                <div class="input-group" style="flex:2; min-width:0; margin:0;"><label>Cantidad de Cátedras</label><input type="number" min="1" value="${r.cantCat}" data-action-change="actualizarCantidad:${r.id},cat"></div>
+                <div class="input-group" style="flex:2; min-width:0; margin:0;"><label>Cantidad de Cátedras</label>${inputCatHTML}</div>
                 <label class="toggle-avanzado" style="flex:1.3; min-width:120px; margin:24px 0 0 0;" title="Reemplaza tu nota más baja entre N1-N3"><span>Prueba PAR</span><input type="checkbox" data-action-change="togglePAR:${r.id}" ${r.usaPAR ? 'checked' : ''}></label>
             </div>
             <div class="notas-grid">${inputsCatHTML}</div>
@@ -1683,7 +1770,7 @@ function renderCardNuevo(r) {
             ${r.tieneEjercicios ? `
             <div class="notas-subtitulo">Otras Actividades (Talleres-Controles)</div>
             <div class="config-row" style="margin-bottom:12px;">
-                <div class="input-group"><label>Cantidad de Ejercicios</label><input type="number" min="1" value="${r.cantEj}" data-action-change="actualizarCantidad:${r.id},ej"></div>
+                <div class="input-group"><label>Cantidad de Ejercicios</label>${inputEjHTML}</div>
                 <div class="input-group"><label title="Si ya sabes el promedio pero no las notas individuales, ponlo aquí">Promedio (opcional)</label><input type="number" step="0.1" min="1" max="7" value="${r.promedioEjManual}" placeholder="Ej: 6,4" data-action-input="actualizarPromedioEjManualLive:${r.id}" data-action-change="actualizarPromedioEjManual:${r.id}"></div>
             </div>
             <div class="notas-grid">${inputsEjHTML}</div>` : ''}
@@ -1691,7 +1778,7 @@ function renderCardNuevo(r) {
             ${r.tieneLab ? `
             <div class="notas-subtitulo">Notas de Laboratorio</div>
             <div style="display:flex; gap:12px; align-items:stretch; margin-bottom:12px;">
-                <div class="input-group" style="flex:2; min-width:0; margin:0;"><label>Cantidad de Laboratorios</label><input type="number" min="1" value="${r.cantLab}" data-action-change="actualizarCantidad:${r.id},lab"></div>
+                <div class="input-group" style="flex:2; min-width:0; margin:0;"><label>Cantidad de Laboratorios</label>${inputLabHTML}</div>
                 <label class="toggle-avanzado" style="flex:1.3; min-width:130px; margin:24px 0 0 0;" title="Reemplaza tu nota más baja del laboratorio"><span>Recuperativo</span><input type="checkbox" data-action-change="toggleRecuperativoLab:${r.id}" ${r.usaRecuperativoLab ? 'checked' : ''}></label>
             </div>
             <div class="notas-grid">${inputsLabHTML}</div>
